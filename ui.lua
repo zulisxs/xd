@@ -1168,22 +1168,143 @@ Main:Button({
         -- Crear la UI con los contadores
         crearUI()
 
-        -- Teleport al primer boss elegido
+        -- Teleport al primer boss elegido (solo si no está en su mapa/zona)
         local primerBoss = BossesElegidos[1]
         if InfoBoss[primerBoss] then
-            fireTeleport(InfoBoss[primerBoss].MapName, InfoBoss[primerBoss].ZoneIndex)
+            local info = InfoBoss[primerBoss]
+            if Omni.Data.Map ~= info.MapName or tostring(Omni.Data.Zone) ~= tostring(info.ZoneIndex) then
+                fireTeleport(info.MapName, info.ZoneIndex)
+            end
         end
     end
 })
 
 -- ─── Toggles ──────────────────────────────────────────────────────────────
+local bossAutoFarmActive = false
+local PlayerStatsBoss = Omni.Utils.PlayerStats
+local bossEnemyFolder = workspace:WaitForChild("Server"):WaitForChild("Enemies"):FindFirstChild("Global Bosses")
+
+local function isGlobalBossAlive(boss)
+    if boss == nil or boss.Parent == nil then return false end
+    if boss:GetAttribute("Died") then return false end
+    local health = boss:GetAttribute("Health") or 0
+    return health > 0
+end
+
 local FarmBoss = Main:Toggle({
     Title    = "Auto Farm Global Bosses",
     Icon     = "skull",
     Type     = "Checkbox",
     Value    = false,
     Callback = function(state)
-        print("Toggle Activated" .. tostring(state))
+        bossAutoFarmActive = state
+        if state then
+            crearUI()
+            task.spawn(function()
+                while bossAutoFarmActive do
+                    for _, bossName in pairs(BossesElegidos) do
+                        if not bossAutoFarmActive then break end
+
+                        -- Leer timer del boss desde templates
+                        local bossFolder = templates:FindFirstChild(bossName)
+                        if not bossFolder then continue end
+                        local hud = bossFolder:FindFirstChild("HUD")
+                        if not hud then continue end
+                        local timeLabel = hud:FindFirstChild("Time")
+                        if not timeLabel then continue end
+
+                        local tiempo = textoASegundos(timeLabel.Text)
+                        if tiempo > 0 then continue end
+
+                        -- ¡Boss vivo! Esperar a que salga del gamemode si está en uno
+                        while bossAutoFarmActive and GameMode:IsInGamemode() do
+                            task.wait(1)
+                        end
+                        if not bossAutoFarmActive then break end
+
+                        -- Pausar autofarm si está corriendo
+                        local wasAutoFarming = Functions:IsAutoFarmRunning()
+                        if wasAutoFarming then
+                            Functions:SetAutoFarm(false, selectedEnemies, selectedPriority)
+                        end
+
+                        -- Guardar posición actual
+                        local prevMap = Omni.Data.Map
+                        local prevZone = Omni.Data.Zone
+                        local char = Players.LocalPlayer.Character
+                        local prevCFrame = char and char:FindFirstChild("HumanoidRootPart") and char.HumanoidRootPart.CFrame
+
+                        -- Teleport al mapa del boss (solo si no está ahí)
+                        local info = InfoBoss[bossName]
+                        if info and (Omni.Data.Map ~= info.MapName or tostring(Omni.Data.Zone) ~= tostring(info.ZoneIndex)) then
+                            fireTeleport(info.MapName, info.ZoneIndex)
+                            task.wait(3)
+                        end
+
+                        -- Buscar y matar al boss
+                        if bossEnemyFolder then
+                            local boss = nil
+                            for _, e in ipairs(bossEnemyFolder:GetChildren()) do
+                                if e:IsA("BasePart") and e.Name == bossName and isGlobalBossAlive(e) then
+                                    boss = e
+                                    break
+                                end
+                            end
+
+                            if boss then
+                                -- Teleportar al boss
+                                local hrp = workspace:FindFirstChild(Players.LocalPlayer.Name)
+                                    and workspace[Players.LocalPlayer.Name]:FindFirstChild("HumanoidRootPart")
+                                if hrp then
+                                    hrp.CFrame = boss.CFrame + Vector3.new(0, 10, 0)
+                                end
+
+                                local _, finalDamage = PlayerStatsBoss.Damage(Omni.Data, Omni.Instance)
+                                local enemyHealth = boss:GetAttribute("Health") or 0
+
+                                if finalDamage >= enemyHealth then
+                                    -- One-shot, esperar un poco
+                                    task.wait(0.5)
+                                else
+                                    -- Esperar a que muera, re-teleportando
+                                    while bossAutoFarmActive and isGlobalBossAlive(boss) do
+                                        hrp = workspace:FindFirstChild(Players.LocalPlayer.Name)
+                                            and workspace[Players.LocalPlayer.Name]:FindFirstChild("HumanoidRootPart")
+                                        if hrp and boss.Parent then
+                                            hrp.CFrame = boss.CFrame + Vector3.new(0, 10, 0)
+                                        end
+                                        task.wait(0.1)
+                                    end
+                                end
+                                print("[BOSS] " .. bossName .. " killed")
+                            end
+                        end
+
+                        -- Refrescar timers (re-lee templates)
+                        crearUI()
+
+                        -- Volver al mapa/zona anterior
+                        fireTeleport(prevMap, prevZone)
+                        task.wait(3)
+                        if prevCFrame then
+                            local char2 = Players.LocalPlayer.Character
+                            if char2 and char2:FindFirstChild("HumanoidRootPart") then
+                                char2.HumanoidRootPart.CFrame = prevCFrame
+                            end
+                        end
+                        task.wait(2)
+
+                        -- Reanudar autofarm
+                        if wasAutoFarming then
+                            Functions:SetAutoFarm(true, selectedEnemies, selectedPriority)
+                        end
+                    end
+                    task.wait(2) -- Revisar cada 2 segundos
+                end
+            end)
+        else
+            limpiarUI()
+        end
     end
 })
 
@@ -1194,11 +1315,9 @@ local UIBoss = Main:Toggle({
     Value    = false,
     Callback = function(state)
         if state then
-            -- ocultar el frame
             local frame = frames:FindFirstChild("BossTimer")
             if frame then frame.Visible = false end
         else
-            -- mostrar el frame
             local frame = frames:FindFirstChild("BossTimer")
             if frame then frame.Visible = true end
         end
