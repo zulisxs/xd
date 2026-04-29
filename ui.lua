@@ -1277,6 +1277,7 @@ local FarmBoss = Main:Toggle({
     Value    = false,
     Callback = function(state)
         bossAutoFarmActive = state
+        GameMode:SetBossAutoFarm(state)
         if state then
             -- Extraer nombres (soporta array y dict)
             local bossNames = {}
