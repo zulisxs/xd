@@ -1182,7 +1182,6 @@ Main:Button({
 -- ─── Toggles ──────────────────────────────────────────────────────────────
 local bossAutoFarmActive = false
 local PlayerStatsBoss = Omni.Utils.PlayerStats
-local bossEnemyFolder = workspace:WaitForChild("Server"):WaitForChild("Enemies"):FindFirstChild("Global Bosses")
 
 local function isGlobalBossAlive(boss)
     if boss == nil or boss.Parent == nil then return false end
@@ -1204,7 +1203,8 @@ local FarmBoss = Main:Toggle({
             crearUI()
             task.spawn(function()
                 while bossAutoFarmActive do
-                    for _, bossName in pairs(BossesElegidos) do
+                    for bossName, selected in pairs(BossesElegidos) do
+                        if not selected then continue end
                         if not bossAutoFarmActive then break end
 
                         -- Leer timer del boss desde templates
@@ -1217,6 +1217,8 @@ local FarmBoss = Main:Toggle({
 
                         local tiempo = textoASegundos(timeLabel.Text)
                         if tiempo > 0 then continue end
+
+                        print("[BOSS] " .. bossName .. " está vivo! Preparando...")
 
                         -- ¡Boss vivo! Esperar a que salga del gamemode si está en uno
                         while bossAutoFarmActive and GameMode:IsInGamemode() do
@@ -1243,7 +1245,11 @@ local FarmBoss = Main:Toggle({
                             task.wait(3)
                         end
 
-                        -- Buscar y matar al boss
+                        -- Buscar folder de bosses dinámicamente
+                        local bossEnemyFolder = workspace:FindFirstChild("Server")
+                            and workspace.Server:FindFirstChild("Enemies")
+                            and workspace.Server.Enemies:FindFirstChild("Global Bosses")
+
                         if bossEnemyFolder then
                             local boss = nil
                             for _, e in ipairs(bossEnemyFolder:GetChildren()) do
@@ -1254,7 +1260,7 @@ local FarmBoss = Main:Toggle({
                             end
 
                             if boss then
-                                -- Teleportar al boss
+                                print("[BOSS] Encontrado " .. bossName .. " → atacando")
                                 local hrp = workspace:FindFirstChild(LocalPlayer.Name)
                                     and workspace[LocalPlayer.Name]:FindFirstChild("HumanoidRootPart")
                                 if hrp then
@@ -1265,10 +1271,8 @@ local FarmBoss = Main:Toggle({
                                 local enemyHealth = boss:GetAttribute("Health") or 0
 
                                 if finalDamage >= enemyHealth then
-                                    -- One-shot, esperar un poco
                                     task.wait(0.5)
                                 else
-                                    -- Esperar a que muera, re-teleportando
                                     while bossAutoFarmActive and isGlobalBossAlive(boss) do
                                         hrp = workspace:FindFirstChild(LocalPlayer.Name)
                                             and workspace[LocalPlayer.Name]:FindFirstChild("HumanoidRootPart")
@@ -1279,7 +1283,11 @@ local FarmBoss = Main:Toggle({
                                     end
                                 end
                                 print("[BOSS] " .. bossName .. " killed")
+                            else
+                                print("[BOSS] " .. bossName .. " no encontrado en folder")
                             end
+                        else
+                            print("[BOSS] Folder 'Global Bosses' no encontrado")
                         end
 
                         -- Refrescar timers (re-lee templates)
