@@ -15,6 +15,7 @@ local functionsRef    = nil
 local savedEnemies    = nil
 local savedPriority   = nil
 local savedPositionRef = nil
+local bossAutoFarmActive = false
 
 -- Toggle states (cada toggle es independiente)
 local trialEnabled   = false
@@ -169,6 +170,10 @@ end
 
 local function resumeAutoFarm()
     if functionsRef and autoFarmPaused then
+        if bossAutoFarmActive then
+            print("[RESUME] AutoFarm skip: boss farm activo")
+            return
+        end
         autoFarmPaused = false
         functionsRef:SetAutoFarm(true, savedEnemies, savedPriority)
         print("[RESUME] AutoFarm resumed")
@@ -551,6 +556,11 @@ end
 
 function GameMode:IsInGamemode()
     return currentGamemode ~= nil
+end
+
+function GameMode:SetBossAutoFarm(active)
+    bossAutoFarmActive = active
+    print("[BOSS-DBG] GameMode.bossAutoFarmActive = " .. tostring(active))
 end
 
 return GameMode
