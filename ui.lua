@@ -1212,10 +1212,9 @@ local FarmBoss = Main:Toggle({
             end
             task.spawn(function()
                 while bossAutoFarmActive do
+                    -- 1. Recolectar TODOS los bosses alive
+                    local aliveBosses = {}
                     for _, bossName in ipairs(BossesElegidos) do
-                        if not bossAutoFarmActive then break end
-
-                        -- Leer timer del boss desde templates
                         local bossFolder = templates:FindFirstChild(bossName)
                         if not bossFolder then continue end
                         local hud = bossFolder:FindFirstChild("HUD")
@@ -1224,129 +1223,141 @@ local FarmBoss = Main:Toggle({
                         if not timeLabel then continue end
 
                         local tiempo = textoASegundos(timeLabel.Text)
-                        if tiempo > 0 then continue end
+                        if tiempo <= 0 then
+                            table.insert(aliveBosses, bossName)
+                        end
+                    end
 
-                        print("[BOSS] " .. bossName .. " está vivo! Preparando...")
+                    if #aliveBosses > 0 then
+                        print("[BOSS] Bosses alive: " .. table.concat(aliveBosses, ", "))
 
-                        -- ¡Boss vivo! Esperar a que salga del gamemode si está en uno
+                        -- 2. Esperar a que salga del gamemode
                         while bossAutoFarmActive and GameMode:IsInGamemode() do
                             task.wait(1)
                         end
                         if not bossAutoFarmActive then break end
 
-                        -- Pausar autofarm si está corriendo
+                        -- 3. Pausar autofarm
                         local wasAutoFarming = Functions:IsAutoFarmRunning()
                         if wasAutoFarming then
                             Functions:SetAutoFarm(false, selectedEnemies, selectedPriority)
                         end
 
-                        -- Guardar posición actual
-                        local prevMap = Omni.Data.Map
-                        local prevZone = Omni.Data.Zone
-                        local char = LocalPlayer.Character
-                        local prevCFrame = char and char:FindFirstChild("HumanoidRootPart") and char.HumanoidRootPart.CFrame
-
-                        -- Teleport al mapa del boss (solo si no está ahí)
-                        local info = InfoBoss[bossName]
-                        if info and (Omni.Data.Map ~= info.MapName or tostring(Omni.Data.Zone) ~= tostring(info.ZoneIndex)) then
-                            fireTeleport(info.MapName, info.ZoneIndex)
-                            task.wait(3)
+                        -- 4. Guardar posición de retorno
+                        local returnMap, returnZone, returnCFrame
+                        if savedPosition.cframe then
+                            returnMap    = savedPosition.map
+                            returnZone   = savedPosition.zone
+                            returnCFrame = savedPosition.cframe
+                        else
+                            returnMap  = Omni.Data.Map
+                            returnZone = Omni.Data.Zone
+                            local char = LocalPlayer.Character
+                            returnCFrame = char and char:FindFirstChild("HumanoidRootPart") and char.HumanoidRootPart.CFrame
                         end
 
-                        -- Buscar folder de bosses dinámicamente
-                        local bossEnemyFolder = workspace:FindFirstChild("Server")
-                            and workspace.Server:FindFirstChild("Enemies")
-                            and workspace.Server.Enemies:FindFirstChild("Global Bosses")
+                        -- 5. Matar TODOS los bosses alive en un viaje
+                        for _, bossName in ipairs(aliveBosses) do
+                            if not bossAutoFarmActive then break end
 
-                        -- Buscar boss en folder
-                        local boss = nil
-                        if bossEnemyFolder then
-                            for _, e in ipairs(bossEnemyFolder:GetChildren()) do
-                                if e:IsA("BasePart") and e.Name == bossName and isGlobalBossAlive(e) then
-                                    boss = e
-                                    break
-                                end
+                            -- Teleport al mapa del boss si no está ahí
+                            local info = InfoBoss[bossName]
+                            if info and (Omni.Data.Map ~= info.MapName or tostring(Omni.Data.Zone) ~= tostring(info.ZoneIndex)) then
+                                fireTeleport(info.MapName, info.ZoneIndex)
+                                task.wait(3)
                             end
-                        end
 
-                        -- Flotar
-                        Functions:SetFloating(true)
+                            -- Buscar folder de bosses
+                            local bossEnemyFolder = workspace:FindFirstChild("Server")
+                                and workspace.Server:FindFirstChild("Enemies")
+                                and workspace.Server.Enemies:FindFirstChild("Global Bosses")
 
-                        if boss then
-                            -- Boss encontrado, teleportar a su posición
-                            print("[BOSS] Encontrado " .. bossName .. " → atacando")
-                            local hrp = workspace:FindFirstChild(LocalPlayer.Name)
-                                and workspace[LocalPlayer.Name]:FindFirstChild("HumanoidRootPart")
-                            if hrp then
-                                hrp.CFrame = boss.CFrame + Vector3.new(0, 10, 0)
-                            end
-                        elseif BossCFrames[bossName] then
-                            -- Boss no cargó, ir a su CFrame conocido y esperar
-                            print("[BOSS] " .. bossName .. " no cargó, yendo a CFrame conocido...")
-                            local hrp = workspace:FindFirstChild(LocalPlayer.Name)
-                                and workspace[LocalPlayer.Name]:FindFirstChild("HumanoidRootPart")
-                            if hrp then
-                                hrp.CFrame = BossCFrames[bossName] + Vector3.new(0, 10, 0)
-                            end
-                            -- Esperar a que aparezca el BasePart
-                            while bossAutoFarmActive and not boss do
-                                task.wait(0.5)
-                                bossEnemyFolder = workspace:FindFirstChild("Server")
-                                    and workspace.Server:FindFirstChild("Enemies")
-                                    and workspace.Server.Enemies:FindFirstChild("Global Bosses")
-                                if bossEnemyFolder then
-                                    for _, e in ipairs(bossEnemyFolder:GetChildren()) do
-                                        if e:IsA("BasePart") and e.Name == bossName and isGlobalBossAlive(e) then
-                                            boss = e
-                                            break
-                                        end
+                            local boss = nil
+                            if bossEnemyFolder then
+                                for _, e in ipairs(bossEnemyFolder:GetChildren()) do
+                                    if e:IsA("BasePart") and e.Name == bossName and isGlobalBossAlive(e) then
+                                        boss = e
+                                        break
                                     end
                                 end
                             end
+
+                            -- Flotar y teleportar
+                            Functions:SetFloating(true)
+
                             if boss then
-                                print("[BOSS] " .. bossName .. " apareció! Teleportando...")
-                                local hrp2 = workspace:FindFirstChild(LocalPlayer.Name)
+                                print("[BOSS] Encontrado " .. bossName .. " → atacando")
+                                local hrp = workspace:FindFirstChild(LocalPlayer.Name)
                                     and workspace[LocalPlayer.Name]:FindFirstChild("HumanoidRootPart")
-                                if hrp2 then
-                                    hrp2.CFrame = boss.CFrame + Vector3.new(0, 10, 0)
+                                if hrp then
+                                    hrp.CFrame = boss.CFrame + Vector3.new(0, 10, 0)
+                                end
+                            elseif BossCFrames[bossName] then
+                                print("[BOSS] " .. bossName .. " no cargó, yendo a CFrame conocido...")
+                                local hrp = workspace:FindFirstChild(LocalPlayer.Name)
+                                    and workspace[LocalPlayer.Name]:FindFirstChild("HumanoidRootPart")
+                                if hrp then
+                                    hrp.CFrame = BossCFrames[bossName] + Vector3.new(0, 10, 0)
+                                end
+                                -- Esperar a que aparezca
+                                while bossAutoFarmActive and not boss do
+                                    task.wait(0.5)
+                                    bossEnemyFolder = workspace:FindFirstChild("Server")
+                                        and workspace.Server:FindFirstChild("Enemies")
+                                        and workspace.Server.Enemies:FindFirstChild("Global Bosses")
+                                    if bossEnemyFolder then
+                                        for _, e in ipairs(bossEnemyFolder:GetChildren()) do
+                                            if e:IsA("BasePart") and e.Name == bossName and isGlobalBossAlive(e) then
+                                                boss = e
+                                                break
+                                            end
+                                        end
+                                    end
+                                end
+                                if boss then
+                                    print("[BOSS] " .. bossName .. " apareció!")
+                                    local hrp2 = workspace:FindFirstChild(LocalPlayer.Name)
+                                        and workspace[LocalPlayer.Name]:FindFirstChild("HumanoidRootPart")
+                                    if hrp2 then
+                                        hrp2.CFrame = boss.CFrame + Vector3.new(0, 10, 0)
+                                    end
                                 end
                             end
-                        else
-                            print("[BOSS] " .. bossName .. " sin CFrame conocido ni encontrado")
-                        end
 
-                        -- Esperar a que el boss muera (su BasePart se borra del folder)
-                        if boss then
-                            while bossAutoFarmActive and boss and boss.Parent ~= nil do
-                                task.wait(0.1)
+                            -- Esperar a que muera
+                            if boss then
+                                while bossAutoFarmActive and boss and boss.Parent ~= nil do
+                                    task.wait(0.1)
+                                end
+                                print("[BOSS] " .. bossName .. " killed")
                             end
-                            print("[BOSS] " .. bossName .. " killed")
+
+                            Functions:SetFloating(false)
                         end
 
-                        Functions:SetFloating(false)
-
-                        -- Esperar a que el juego actualice los timers
+                        -- 6. Esperar y refrescar timers
                         task.wait(3)
-                        -- Refrescar timers (re-lee templates)
                         crearUI()
-                        print("[BOSS] Timer actualizado: " .. (templates:FindFirstChild(bossName) and templates[bossName]:FindFirstChild("HUD") and templates[bossName].HUD:FindFirstChild("Time") and templates[bossName].HUD.Time.Text or "N/A"))
 
-                        -- Volver al mapa/zona anterior
-                        fireTeleport(prevMap, prevZone)
-                        task.wait(3)
-                        if prevCFrame then
+                        -- 7. Volver a savedPosition o posición anterior
+                        if returnMap then
+                            fireTeleport(returnMap, returnZone)
+                            task.wait(3)
+                        end
+                        if returnCFrame then
                             local char2 = LocalPlayer.Character
                             if char2 and char2:FindFirstChild("HumanoidRootPart") then
-                                char2.HumanoidRootPart.CFrame = prevCFrame
+                                char2.HumanoidRootPart.CFrame = returnCFrame
                             end
                         end
                         task.wait(2)
 
-                        -- Reanudar autofarm
+                        -- 8. Reanudar autofarm
                         if wasAutoFarming then
                             Functions:SetAutoFarm(true, selectedEnemies, selectedPriority)
                         end
                     end
+
                     task.wait(2) -- Revisar cada 2 segundos
                 end
             end)
