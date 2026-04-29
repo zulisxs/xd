@@ -1185,7 +1185,6 @@ local PlayerStatsBoss = Omni.Utils.PlayerStats
 
 local function isGlobalBossAlive(boss)
     if boss == nil or boss.Parent == nil then return false end
-    if boss:GetAttribute("Died") then return false end
     local health = boss:GetAttribute("Health") or 0
     return health > 0
 end
@@ -1200,11 +1199,13 @@ local FarmBoss = Main:Toggle({
     Callback = function(state)
         bossAutoFarmActive = state
         if state then
-            crearUI()
+            -- Solo crear UI si no existe
+            if not frames:FindFirstChild("BossTimer") then
+                crearUI()
+            end
             task.spawn(function()
                 while bossAutoFarmActive do
-                    for bossName, selected in pairs(BossesElegidos) do
-                        if not selected then continue end
+                    for _, bossName in ipairs(BossesElegidos) do
                         if not bossAutoFarmActive then break end
 
                         -- Leer timer del boss desde templates
