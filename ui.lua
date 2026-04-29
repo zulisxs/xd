@@ -1277,7 +1277,6 @@ local FarmBoss = Main:Toggle({
     Value    = false,
     Callback = function(state)
         bossAutoFarmActive = state
-        GameMode:SetBossAutoFarm(state)
         if state then
             -- Extraer nombres (soporta array y dict)
             local bossNames = {}
@@ -1343,227 +1342,142 @@ local FarmBoss = Main:Toggle({
                 end
             end
 
-            -- Crear UI si no existe (UI hace su propio countdown)
+            -- Crear UI si no existe
             if not frames:FindFirstChild("BossTimer") then
                 crearUI()
             end
 
-            -- Función helper: leer timer desde UI BossTimer
+            -- ═══ FUNCIÓN: leer timer desde UI ═══
             local function getUITimer(bossName)
                 local bossTimerFrame = frames:FindFirstChild("BossTimer")
-                if not bossTimerFrame then
-                    print("[BOSS-DBG] getUITimer(" .. bossName .. "): BossTimer frame NO existe")
-                    return nil
-                end
+                if not bossTimerFrame then return nil end
                 local fondo = bossTimerFrame:FindFirstChild("ImageLabel")
-                if not fondo then
-                    print("[BOSS-DBG] getUITimer(" .. bossName .. "): ImageLabel NO existe")
-                    return nil
-                end
+                if not fondo then return nil end
                 local bossLabel = fondo:FindFirstChild(bossName)
-                if not bossLabel then
-                    print("[BOSS-DBG] getUITimer(" .. bossName .. "): Label '" .. bossName .. "' NO existe en fondo")
-                    print("[BOSS-DBG] Hijos de fondo:")
-                    for _, child in ipairs(fondo:GetChildren()) do
-                        print("[BOSS-DBG]   " .. child.ClassName .. " '" .. child.Name .. "'")
-                    end
-                    return nil
-                end
+                if not bossLabel then return nil end
                 local timerLabel = bossLabel:FindFirstChild("Timer")
-                if not timerLabel then
-                    print("[BOSS-DBG] getUITimer(" .. bossName .. "): Timer label NO existe")
-                    return nil
-                end
+                if not timerLabel then return nil end
                 return timerLabel.Text
             end
 
-            -- ═══ LOOP PRINCIPAL ═══
-            print("[BOSS-DBG] Iniciando loop principal...")
-            task.spawn(function()
-                local loopCount = 0
-                while bossAutoFarmActive do
-                    loopCount = loopCount + 1
-                    -- Leer timers desde la UI
-                    local aliveBosses = {}
-                    for _, bossName in ipairs(bossNames) do
-                        local uiText = getUITimer(bossName)
-                        if loopCount % 15 == 1 then -- Print cada 30s (15 ciclos x 2s)
-                            print("[BOSS-DBG] Loop #" .. loopCount .. " | " .. bossName .. " UI: '" .. tostring(uiText) .. "'")
-                        end
-                        if uiText and uiText == "Boss Alive" then
-                            table.insert(aliveBosses, bossName)
-                        end
+            -- ═══ FUNCIÓN: obtener bosses alive (para scheduler) ═══
+            local function getAliveBosses()
+                local alive = {}
+                for _, bossName in ipairs(bossNames) do
+                    local uiText = getUITimer(bossName)
+                    if uiText and uiText == "Boss Alive" then
+                        table.insert(alive, bossName)
                     end
-
-                    if #aliveBosses > 0 then
-                        print("[BOSS] Timers en 0: " .. table.concat(aliveBosses, ", "))
-
-                        -- Esperar gamemode
-                        while bossAutoFarmActive and GameMode:IsInGamemode() do
-                            task.wait(1)
-                        end
-                        if not bossAutoFarmActive then break end
-                        -- Esperar a que el juego salga completamente del gamemode
-                        task.wait(3)
-                        print("[BOSS] Gamemode terminado, iniciando farm...")
-
-                        -- Pausar autofarm
-                        local wasAutoFarming = Functions:IsAutoFarmRunning()
-                        print("[BOSS-DBG] wasAutoFarming: " .. tostring(wasAutoFarming))
-                        if wasAutoFarming then
-                            print("[BOSS-DBG] Pausando autofarm...")
-                            Functions:SetAutoFarm(false, selectedEnemies, selectedPriority)
-                        end
-
-                        -- Guardar retorno
-                        local returnMap, returnZone, returnCFrame
-                        if savedPosition.cframe then
-                            returnMap    = savedPosition.map
-                            returnZone   = savedPosition.zone
-                            returnCFrame = savedPosition.cframe
-                            print("[BOSS-DBG] Retorno: savedPosition → " .. tostring(returnMap) .. " zona " .. tostring(returnZone))
-                        else
-                            returnMap  = Omni.Data.Map
-                            returnZone = Omni.Data.Zone
-                            local char = LocalPlayer.Character
-                            returnCFrame = char and char:FindFirstChild("HumanoidRootPart") and char.HumanoidRootPart.CFrame
-                            print("[BOSS-DBG] Retorno: posición actual → " .. tostring(returnMap) .. " zona " .. tostring(returnZone))
-                        end
-
-                        -- Matar bosses
-                        for _, bossName in ipairs(aliveBosses) do
-                            if not bossAutoFarmActive then break end
-
-                            -- 1. Ir al mapa/zona
-                            local info = InfoBoss[bossName]
-                            if info and (Omni.Data.Map ~= info.MapName or tostring(Omni.Data.Zone) ~= tostring(info.ZoneIndex)) then
-                                print("[BOSS] TP al mapa: " .. info.MapName)
-                                fireTeleport(info.MapName, info.ZoneIndex)
-                                task.wait(3)
-                            end
-
-                            -- 2. Esperar a que cargue el mapa, luego ir al CFrame del boss
-                            task.wait(1.5)
-                            Functions:SetFloating(true)
-                            if BossCFrames[bossName] then
-                                local hrp = workspace:FindFirstChild(LocalPlayer.Name)
-                                    and workspace[LocalPlayer.Name]:FindFirstChild("HumanoidRootPart")
-                                if hrp then
-                                    print("[BOSS] Yendo a CFrame de " .. bossName)
-                                    hrp.CFrame = BossCFrames[bossName] + Vector3.new(0, 10, 0)
-                                end
-                            end
-                            task.wait(1)
-
-                            -- 3. Verificar templates.Time == "0s" (con espera si faltan pocos segundos)
-                            local bossFolder = templates:FindFirstChild(bossName)
-                            local isAlive = false
-                            if bossFolder then
-                                local hud = bossFolder:FindFirstChild("HUD")
-                                local tl = hud and hud:FindFirstChild("Time")
-                                if tl then
-                                    local timerText = tl.Text
-                                    local remaining = textoASegundos(timerText)
-                                    print("[BOSS] " .. bossName .. " check: '" .. timerText .. "' (" .. remaining .. "s)")
-
-                                    -- Si faltan pocos segundos, esperar y re-verificar
-                                    if remaining > 0 and remaining <= 10 then
-                                        print("[BOSS] " .. bossName .. " faltan " .. remaining .. "s, esperando...")
-                                        task.wait(remaining + 1)
-                                        timerText = tl.Text
-                                        remaining = textoASegundos(timerText)
-                                        print("[BOSS] " .. bossName .. " re-check: '" .. timerText .. "'")
-                                    end
-
-                                    isAlive = (timerText == "0s")
-                                    print("[BOSS] " .. bossName .. " → " .. (isAlive and "VIVO" or "MUERTO"))
-                                end
-                            end
-
-                            if isAlive then
-                                -- 4. Esperar a que muera (templates.Time deje de ser "0s")
-                                print("[BOSS] " .. bossName .. " VIVO → esperando muerte...")
-                                while bossAutoFarmActive do
-                                    -- Si un gamemode arrancó, esperar que termine y re-tp
-                                    if GameMode:IsInGamemode() then
-                                        print("[BOSS-DBG] Gamemode interrumpió farm de " .. bossName .. ", esperando...")
-                                        Functions:SetFloating(false)
-                                        while bossAutoFarmActive and GameMode:IsInGamemode() do
-                                            task.wait(1)
-                                        end
-                                        if not bossAutoFarmActive then break end
-                                        task.wait(3)
-                                        print("[BOSS-DBG] Gamemode terminó, re-teleportando a " .. bossName)
-                                        -- Re-teleport al mapa y CFrame del boss
-                                        local info2 = InfoBoss[bossName]
-                                        if info2 and (Omni.Data.Map ~= info2.MapName or tostring(Omni.Data.Zone) ~= tostring(info2.ZoneIndex)) then
-                                            fireTeleport(info2.MapName, info2.ZoneIndex)
-                                            task.wait(3)
-                                        end
-                                        Functions:SetFloating(true)
-                                        if BossCFrames[bossName] then
-                                            local hrp2 = workspace:FindFirstChild(LocalPlayer.Name)
-                                                and workspace[LocalPlayer.Name]:FindFirstChild("HumanoidRootPart")
-                                            if hrp2 then
-                                                hrp2.CFrame = BossCFrames[bossName] + Vector3.new(0, 10, 0)
-                                            end
-                                        end
-                                        task.wait(1)
-                                    end
-
-                                    -- Verificar si el boss murió
-                                    local bf = templates:FindFirstChild(bossName)
-                                    if bf then
-                                        local h = bf:FindFirstChild("HUD")
-                                        local t = h and h:FindFirstChild("Time")
-                                        if t and t.Text ~= "0s" then
-                                            print("[BOSS] " .. bossName .. " killed! Nuevo timer: '" .. t.Text .. "'")
-                                            break
-                                        end
-                                    end
-                                    task.wait(0.5)
-                                end
-
-                                -- 5. Actualizar solo este boss en la UI
-                                task.wait(1)
-                                reiniciarContador(bossName)
-                            else
-                                print("[BOSS] " .. bossName .. " ya muerto, actualizando timer...")
-                                reiniciarContador(bossName)
-                            end
-
-                            Functions:SetFloating(false)
-                        end
-
-                        -- Volver
-                        print("[BOSS-DBG] Volviendo a " .. tostring(returnMap) .. " zona " .. tostring(returnZone))
-                        if returnMap then
-                            fireTeleport(returnMap, returnZone)
-                            task.wait(3)
-                        end
-                        if returnCFrame then
-                            local c = LocalPlayer.Character
-                            if c and c:FindFirstChild("HumanoidRootPart") then
-                                c.HumanoidRootPart.CFrame = returnCFrame
-                                print("[BOSS-DBG] CFrame restaurado")
-                            else
-                                print("[BOSS-DBG] No se pudo restaurar CFrame (char nil)")
-                            end
-                        end
-                        task.wait(2)
-
-                        -- Reanudar autofarm
-                        if wasAutoFarming then
-                            print("[BOSS-DBG] Reanudando autofarm...")
-                            Functions:SetAutoFarm(true, selectedEnemies, selectedPriority)
-                        end
-                        print("[BOSS-DBG] Ciclo de farm completado")
-                    end
-
-                    task.wait(2)
                 end
-            end)
+                return alive
+            end
+
+            -- ═══ FUNCIÓN: ejecutar ciclo de farm (llamada por scheduler) ═══
+            local function ejecutarCicloBoss(shouldContinueFn)
+                local aliveBosses = getAliveBosses()
+                if #aliveBosses == 0 then return end
+
+                print("[BOSS] Farm cycle: " .. table.concat(aliveBosses, ", "))
+
+                -- Guardar retorno
+                local returnMap  = Omni.Data.Map
+                local returnZone = Omni.Data.Zone
+                local char = LocalPlayer.Character
+                local returnCFrame = char and char:FindFirstChild("HumanoidRootPart") and char.HumanoidRootPart.CFrame
+
+                for _, bossName in ipairs(aliveBosses) do
+                    if not shouldContinueFn() then
+                        print("[BOSS] Interrumpido por Trial")
+                        break
+                    end
+
+                    local info = InfoBoss[bossName]
+                    if info and (Omni.Data.Map ~= info.MapName or tostring(Omni.Data.Zone) ~= tostring(info.ZoneIndex)) then
+                        print("[BOSS] TP al mapa: " .. info.MapName)
+                        fireTeleport(info.MapName, info.ZoneIndex)
+                        task.wait(3)
+                    end
+                    if not shouldContinueFn() then break end
+
+                    task.wait(1.5)
+                    Functions:SetFloating(true)
+                    if BossCFrames[bossName] then
+                        local hrp = workspace:FindFirstChild(LocalPlayer.Name)
+                            and workspace[LocalPlayer.Name]:FindFirstChild("HumanoidRootPart")
+                        if hrp then
+                            print("[BOSS] Yendo a CFrame de " .. bossName)
+                            hrp.CFrame = BossCFrames[bossName] + Vector3.new(0, 10, 0)
+                        end
+                    end
+                    task.wait(1)
+
+                    local bossFolder = templates:FindFirstChild(bossName)
+                    local isAlive = false
+                    if bossFolder then
+                        local hud = bossFolder:FindFirstChild("HUD")
+                        local tl = hud and hud:FindFirstChild("Time")
+                        if tl then
+                            local timerText = tl.Text
+                            local remaining = textoASegundos(timerText)
+                            print("[BOSS] " .. bossName .. " check: '" .. timerText .. "' (" .. remaining .. "s)")
+
+                            if remaining > 0 and remaining <= 10 then
+                                task.wait(remaining + 1)
+                                timerText = tl.Text
+                                print("[BOSS] " .. bossName .. " re-check: '" .. timerText .. "'")
+                            end
+
+                            isAlive = (timerText == "0s")
+                            print("[BOSS] " .. bossName .. " → " .. (isAlive and "VIVO" or "MUERTO"))
+                        end
+                    end
+
+                    if isAlive then
+                        print("[BOSS] " .. bossName .. " VIVO → esperando muerte...")
+                        while shouldContinueFn() do
+                            local bf = templates:FindFirstChild(bossName)
+                            if bf then
+                                local h = bf:FindFirstChild("HUD")
+                                local t = h and h:FindFirstChild("Time")
+                                if t and t.Text ~= "0s" then
+                                    print("[BOSS] " .. bossName .. " killed! Nuevo timer: '" .. t.Text .. "'")
+                                    break
+                                end
+                            end
+                            task.wait(0.5)
+                        end
+                        task.wait(1)
+                        reiniciarContador(bossName)
+                    else
+                        print("[BOSS] " .. bossName .. " ya muerto, actualizando timer...")
+                        reiniciarContador(bossName)
+                    end
+
+                    Functions:SetFloating(false)
+                end
+
+                -- Volver
+                print("[BOSS-DBG] Volviendo a " .. tostring(returnMap) .. " zona " .. tostring(returnZone))
+                if returnMap then
+                    fireTeleport(returnMap, returnZone)
+                    task.wait(3)
+                end
+                if returnCFrame then
+                    local c = LocalPlayer.Character
+                    if c and c:FindFirstChild("HumanoidRootPart") then
+                        c.HumanoidRootPart.CFrame = returnCFrame
+                        print("[BOSS-DBG] CFrame restaurado")
+                    end
+                end
+                task.wait(1.5)
+                print("[BOSS-DBG] Ciclo de farm completado")
+            end
+
+            -- ═══ REGISTRAR EN SCHEDULER ═══
+            GameMode:StartBossGlobal(getAliveBosses, ejecutarCicloBoss)
         else
+            -- Toggle OFF
+            GameMode:StopBossGlobal()
             limpiarUI()
         end
     end
