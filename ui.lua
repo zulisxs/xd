@@ -1266,7 +1266,7 @@ local BossCFrames = {
     ["Sakana"] = CFrame.new(10572.9756, 659.354675, -5189.31104, 1, 0, 0, 0, 1, 0, 0, 0, 1),
     ["Satoro"] = CFrame.new(10810.6367, 659.341309, -5019.60352, 0.682592869, 0, 0.73079896, 0, 1, 0, -0.73079896, 0, 0.682592869),
     ["Yuje"]   = CFrame.new(10873.502, 773.154114, -5159.50684, -1.1920929e-07, 0, 1.00000012, 0, 1, 0, -1.00000012, 0, -1.1920929e-07),
-}
+}\n
 
 local LocalPlayer = game:GetService("Players").LocalPlayer
 
@@ -1483,7 +1483,34 @@ local FarmBoss = Main:Toggle({
                                 -- 4. Esperar a que muera (templates.Time deje de ser "0s")
                                 print("[BOSS] " .. bossName .. " VIVO → esperando muerte...")
                                 while bossAutoFarmActive do
-                                    task.wait(0.5)
+                                    -- Si un gamemode arrancó, esperar que termine y re-tp
+                                    if GameMode:IsInGamemode() then
+                                        print("[BOSS-DBG] Gamemode interrumpió farm de " .. bossName .. ", esperando...")
+                                        Functions:SetFloating(false)
+                                        while bossAutoFarmActive and GameMode:IsInGamemode() do
+                                            task.wait(1)
+                                        end
+                                        if not bossAutoFarmActive then break end
+                                        task.wait(3)
+                                        print("[BOSS-DBG] Gamemode terminó, re-teleportando a " .. bossName)
+                                        -- Re-teleport al mapa y CFrame del boss
+                                        local info2 = InfoBoss[bossName]
+                                        if info2 and (Omni.Data.Map ~= info2.MapName or tostring(Omni.Data.Zone) ~= tostring(info2.ZoneIndex)) then
+                                            fireTeleport(info2.MapName, info2.ZoneIndex)
+                                            task.wait(3)
+                                        end
+                                        Functions:SetFloating(true)
+                                        if BossCFrames[bossName] then
+                                            local hrp2 = workspace:FindFirstChild(LocalPlayer.Name)
+                                                and workspace[LocalPlayer.Name]:FindFirstChild("HumanoidRootPart")
+                                            if hrp2 then
+                                                hrp2.CFrame = BossCFrames[bossName] + Vector3.new(0, 10, 0)
+                                            end
+                                        end
+                                        task.wait(1)
+                                    end
+
+                                    -- Verificar si el boss murió
                                     local bf = templates:FindFirstChild(bossName)
                                     if bf then
                                         local h = bf:FindFirstChild("HUD")
@@ -1493,13 +1520,15 @@ local FarmBoss = Main:Toggle({
                                             break
                                         end
                                     end
+                                    task.wait(0.5)
                                 end
 
                                 -- 5. Actualizar solo este boss en la UI
                                 task.wait(1)
                                 reiniciarContador(bossName)
                             else
-                                print("[BOSS] " .. bossName .. " ya muerto, skip")
+                                print("[BOSS] " .. bossName .. " ya muerto, actualizando timer...")
+                                reiniciarContador(bossName)
                             end
 
                             Functions:SetFloating(false)
