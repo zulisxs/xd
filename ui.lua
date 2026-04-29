@@ -1126,12 +1126,10 @@ local function crearUI()
 end
 local BossSection = Main:Section({ 
     Title = "Global Bosses",
-    Box = false,
-    Opened = false,
 })
 Main:Divider()
 -- ─── Dropdown ─────────────────────────────────────────────────────────────
-local GlobalBoss = BossSection:Dropdown({
+local GlobalBoss = Main:Dropdown({
     Title     = "Boss",
     Desc      = "Select boss",
     Values    = ListBoss,
@@ -1160,7 +1158,7 @@ local function fireTeleport(worldName, zoneName)
 end
 
 -- ─── Botón de teleport ────────────────────────────────────────────────────
-Boss:Button({
+Main:Button({
     Title    = "Teleport & Track",
     Desc     = "Teleport al boss y activa el timer",
     Icon     = "map-pin",
@@ -1179,7 +1177,7 @@ Boss:Button({
 })
 
 -- ─── Toggles ──────────────────────────────────────────────────────────────
-local FarmBoss = Boss:Toggle({
+local FarmBoss = Main:Toggle({
     Title    = "Auto Farm Global Bosses",
     Icon     = "skull",
     Type     = "Checkbox",
@@ -1189,7 +1187,7 @@ local FarmBoss = Boss:Toggle({
     end
 })
 
-local UIBoss = Boss:Toggle({
+local UIBoss = Main:Toggle({
     Title    = "Hiden UI",
     Icon     = "eye-closed",
     Type     = "Checkbox",
