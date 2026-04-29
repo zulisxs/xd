@@ -1191,6 +1191,8 @@ local function isGlobalBossAlive(boss)
     return health > 0
 end
 
+local LocalPlayer = game:GetService("Players").LocalPlayer
+
 local FarmBoss = Main:Toggle({
     Title    = "Auto Farm Global Bosses",
     Icon     = "skull",
@@ -1231,7 +1233,7 @@ local FarmBoss = Main:Toggle({
                         -- Guardar posición actual
                         local prevMap = Omni.Data.Map
                         local prevZone = Omni.Data.Zone
-                        local char = Players.LocalPlayer.Character
+                        local char = LocalPlayer.Character
                         local prevCFrame = char and char:FindFirstChild("HumanoidRootPart") and char.HumanoidRootPart.CFrame
 
                         -- Teleport al mapa del boss (solo si no está ahí)
@@ -1253,8 +1255,8 @@ local FarmBoss = Main:Toggle({
 
                             if boss then
                                 -- Teleportar al boss
-                                local hrp = workspace:FindFirstChild(Players.LocalPlayer.Name)
-                                    and workspace[Players.LocalPlayer.Name]:FindFirstChild("HumanoidRootPart")
+                                local hrp = workspace:FindFirstChild(LocalPlayer.Name)
+                                    and workspace[LocalPlayer.Name]:FindFirstChild("HumanoidRootPart")
                                 if hrp then
                                     hrp.CFrame = boss.CFrame + Vector3.new(0, 10, 0)
                                 end
@@ -1268,8 +1270,8 @@ local FarmBoss = Main:Toggle({
                                 else
                                     -- Esperar a que muera, re-teleportando
                                     while bossAutoFarmActive and isGlobalBossAlive(boss) do
-                                        hrp = workspace:FindFirstChild(Players.LocalPlayer.Name)
-                                            and workspace[Players.LocalPlayer.Name]:FindFirstChild("HumanoidRootPart")
+                                        hrp = workspace:FindFirstChild(LocalPlayer.Name)
+                                            and workspace[LocalPlayer.Name]:FindFirstChild("HumanoidRootPart")
                                         if hrp and boss.Parent then
                                             hrp.CFrame = boss.CFrame + Vector3.new(0, 10, 0)
                                         end
@@ -1287,7 +1289,7 @@ local FarmBoss = Main:Toggle({
                         fireTeleport(prevMap, prevZone)
                         task.wait(3)
                         if prevCFrame then
-                            local char2 = Players.LocalPlayer.Character
+                            local char2 = LocalPlayer.Character
                             if char2 and char2:FindFirstChild("HumanoidRootPart") then
                                 char2.HumanoidRootPart.CFrame = prevCFrame
                             end
