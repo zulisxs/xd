@@ -956,11 +956,14 @@ local ActiveSell = Accesories:Toggle({
 ------------------AUTO FARM BOSS--------------
 
 -- ─── Data de bosses ───────────────────────────────────────────────────────
+print("[BOSS-DBG] Cargando módulo GlobalBosses...")
 local GlobalBosses = require(game:GetService("ReplicatedStorage").Omni.Shared.GlobalBosses)
+print("[BOSS-DBG] GlobalBosses cargado")
 local templates = workspace:WaitForChild("Server")
     :WaitForChild("Enemies")
     :WaitForChild("Templates")
     :WaitForChild("Global Bosses")
+print("[BOSS-DBG] Templates folder encontrado: " .. tostring(templates))
 
 local ListBoss = {}
 local InfoBoss = {}
@@ -972,7 +975,9 @@ for nombre, info in pairs(GlobalBosses.List) do
         MapName   = info.MapName,
         ZoneIndex = info.ZoneIndex
     }
+    print("[BOSS-DBG] Boss registrado: " .. nombre .. " → " .. info.MapName .. " zona " .. tostring(info.ZoneIndex))
 end
+print("[BOSS-DBG] Total bosses: " .. #ListBoss)
 
 -- ─── Funciones de tiempo ──────────────────────────────────────────────────
 local function textoASegundos(texto)
@@ -1138,6 +1143,10 @@ local GlobalBoss = Main:Dropdown({
     AllowNone = true,
     Callback  = function(option)
         BossesElegidos = option or {}
+        print("[BOSS-DBG] Dropdown changed. BossesElegidos type: " .. type(BossesElegidos))
+        for k, v in pairs(BossesElegidos) do
+            print("[BOSS-DBG]   key=" .. tostring(k) .. " val=" .. tostring(v))
+        end
     end
 })
 
@@ -1279,23 +1288,45 @@ local FarmBoss = Main:Toggle({
             -- Función helper: leer timer desde UI BossTimer
             local function getUITimer(bossName)
                 local bossTimerFrame = frames:FindFirstChild("BossTimer")
-                if not bossTimerFrame then return nil end
+                if not bossTimerFrame then
+                    print("[BOSS-DBG] getUITimer(" .. bossName .. "): BossTimer frame NO existe")
+                    return nil
+                end
                 local fondo = bossTimerFrame:FindFirstChild("ImageLabel")
-                if not fondo then return nil end
+                if not fondo then
+                    print("[BOSS-DBG] getUITimer(" .. bossName .. "): ImageLabel NO existe")
+                    return nil
+                end
                 local bossLabel = fondo:FindFirstChild(bossName)
-                if not bossLabel then return nil end
+                if not bossLabel then
+                    print("[BOSS-DBG] getUITimer(" .. bossName .. "): Label '" .. bossName .. "' NO existe en fondo")
+                    print("[BOSS-DBG] Hijos de fondo:")
+                    for _, child in ipairs(fondo:GetChildren()) do
+                        print("[BOSS-DBG]   " .. child.ClassName .. " '" .. child.Name .. "'")
+                    end
+                    return nil
+                end
                 local timerLabel = bossLabel:FindFirstChild("Timer")
-                if not timerLabel then return nil end
+                if not timerLabel then
+                    print("[BOSS-DBG] getUITimer(" .. bossName .. "): Timer label NO existe")
+                    return nil
+                end
                 return timerLabel.Text
             end
 
             -- ═══ LOOP PRINCIPAL ═══
+            print("[BOSS-DBG] Iniciando loop principal...")
             task.spawn(function()
+                local loopCount = 0
                 while bossAutoFarmActive do
+                    loopCount = loopCount + 1
                     -- Leer timers desde la UI
                     local aliveBosses = {}
                     for _, bossName in ipairs(bossNames) do
                         local uiText = getUITimer(bossName)
+                        if loopCount % 15 == 1 then -- Print cada 30s (15 ciclos x 2s)
+                            print("[BOSS-DBG] Loop #" .. loopCount .. " | " .. bossName .. " UI: '" .. tostring(uiText) .. "'")
+                        end
                         if uiText and uiText == "Boss Alive" then
                             table.insert(aliveBosses, bossName)
                         end
@@ -1315,7 +1346,9 @@ local FarmBoss = Main:Toggle({
 
                         -- Pausar autofarm
                         local wasAutoFarming = Functions:IsAutoFarmRunning()
+                        print("[BOSS-DBG] wasAutoFarming: " .. tostring(wasAutoFarming))
                         if wasAutoFarming then
+                            print("[BOSS-DBG] Pausando autofarm...")
                             Functions:SetAutoFarm(false, selectedEnemies, selectedPriority)
                         end
 
@@ -1325,11 +1358,13 @@ local FarmBoss = Main:Toggle({
                             returnMap    = savedPosition.map
                             returnZone   = savedPosition.zone
                             returnCFrame = savedPosition.cframe
+                            print("[BOSS-DBG] Retorno: savedPosition → " .. tostring(returnMap) .. " zona " .. tostring(returnZone))
                         else
                             returnMap  = Omni.Data.Map
                             returnZone = Omni.Data.Zone
                             local char = LocalPlayer.Character
                             returnCFrame = char and char:FindFirstChild("HumanoidRootPart") and char.HumanoidRootPart.CFrame
+                            print("[BOSS-DBG] Retorno: posición actual → " .. tostring(returnMap) .. " zona " .. tostring(returnZone))
                         end
 
                         -- Matar bosses
@@ -1387,9 +1422,12 @@ local FarmBoss = Main:Toggle({
                                 local bossEnemyFolder = workspace:FindFirstChild("Server")
                                     and workspace.Server:FindFirstChild("Enemies")
                                     and workspace.Server.Enemies:FindFirstChild("Global Bosses")
+                                print("[BOSS-DBG] bossEnemyFolder: " .. tostring(bossEnemyFolder))
                                 local boss = nil
                                 if bossEnemyFolder then
+                                    print("[BOSS-DBG] Hijos en Global Bosses folder:")
                                     for _, e in ipairs(bossEnemyFolder:GetChildren()) do
+                                        print("[BOSS-DBG]   " .. e.ClassName .. " '" .. e.Name .. "' Parent=" .. tostring(e.Parent ~= nil))
                                         if e:IsA("BasePart") and e.Name == bossName then
                                             boss = e
                                             break
@@ -1398,11 +1436,13 @@ local FarmBoss = Main:Toggle({
                                 end
 
                                 if boss then
-                                    print("[BOSS] " .. bossName .. " → esperando muerte...")
+                                    print("[BOSS] " .. bossName .. " BasePart encontrado → esperando muerte...")
                                     while bossAutoFarmActive and boss.Parent ~= nil do
                                         task.wait(0.1)
                                     end
                                     print("[BOSS] " .. bossName .. " killed!")
+                                else
+                                    print("[BOSS-DBG] " .. bossName .. " BasePart NO encontrado en folder!")
                                 end
 
                                 -- 5. Re-leer timer después de matar
@@ -1423,9 +1463,11 @@ local FarmBoss = Main:Toggle({
                         end
 
                         -- Refrescar UI con nuevos timers
+                        print("[BOSS-DBG] Refrescando UI...")
                         crearUI()
 
                         -- Volver
+                        print("[BOSS-DBG] Volviendo a " .. tostring(returnMap) .. " zona " .. tostring(returnZone))
                         if returnMap then
                             fireTeleport(returnMap, returnZone)
                             task.wait(3)
@@ -1434,14 +1476,19 @@ local FarmBoss = Main:Toggle({
                             local c = LocalPlayer.Character
                             if c and c:FindFirstChild("HumanoidRootPart") then
                                 c.HumanoidRootPart.CFrame = returnCFrame
+                                print("[BOSS-DBG] CFrame restaurado")
+                            else
+                                print("[BOSS-DBG] No se pudo restaurar CFrame (char nil)")
                             end
                         end
                         task.wait(2)
 
                         -- Reanudar autofarm
                         if wasAutoFarming then
+                            print("[BOSS-DBG] Reanudando autofarm...")
                             Functions:SetAutoFarm(true, selectedEnemies, selectedPriority)
                         end
+                        print("[BOSS-DBG] Ciclo de farm completado")
                     end
 
                     task.wait(2)
