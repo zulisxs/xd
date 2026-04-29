@@ -549,4 +549,8 @@ function GameMode:StopAll()
     end
 end
 
+function GameMode:IsInGamemode()
+    return currentGamemode ~= nil
+end
+
 return GameMode
