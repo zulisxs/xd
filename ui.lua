@@ -1309,6 +1309,9 @@ local FarmBoss = Main:Toggle({
                             task.wait(1)
                         end
                         if not bossAutoFarmActive then break end
+                        -- Esperar a que el juego salga completamente del gamemode
+                        task.wait(3)
+                        print("[BOSS] Gamemode terminado, iniciando farm...")
 
                         -- Pausar autofarm
                         local wasAutoFarming = Functions:IsAutoFarmRunning()
@@ -1341,12 +1344,14 @@ local FarmBoss = Main:Toggle({
                                 task.wait(3)
                             end
 
-                            -- 2. Ir al CFrame del boss
+                            -- 2. Esperar a que cargue el mapa, luego ir al CFrame del boss
+                            task.wait(1.5)
                             Functions:SetFloating(true)
                             if BossCFrames[bossName] then
                                 local hrp = workspace:FindFirstChild(LocalPlayer.Name)
                                     and workspace[LocalPlayer.Name]:FindFirstChild("HumanoidRootPart")
                                 if hrp then
+                                    print("[BOSS] Yendo a CFrame de " .. bossName)
                                     hrp.CFrame = BossCFrames[bossName] + Vector3.new(0, 10, 0)
                                 end
                             end
