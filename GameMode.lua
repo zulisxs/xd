@@ -15,7 +15,11 @@ local functionsRef    = nil
 local savedEnemies    = nil
 local savedPriority   = nil
 local savedPositionRef = nil
-local bossAutoFarmActive = false
+
+-- Boss Global
+local bossGlobalEnabled = false
+local bossAliveCheckFn  = nil  -- fn() → {"Yuje", "Sakana"} o {}
+local bossFarmCallback  = nil  -- fn(shouldContinueFn) → ejecuta ciclo de farm
 
 -- Toggle states (cada toggle es independiente)
 local trialEnabled   = false
@@ -170,9 +174,12 @@ end
 
 local function resumeAutoFarm()
     if functionsRef and autoFarmPaused then
-        if bossAutoFarmActive then
-            print("[RESUME] AutoFarm skip: boss farm activo")
-            return
+        if bossGlobalEnabled and bossAliveCheckFn then
+            local alive = bossAliveCheckFn()
+            if alive and #alive > 0 then
+                print("[RESUME] AutoFarm skip: boss alive")
+                return
+            end
         end
         autoFarmPaused = false
         functionsRef:SetAutoFarm(true, savedEnemies, savedPriority)
@@ -300,14 +307,22 @@ local function getHighestPriorityActivity()
         end
     end
 
-    -- Prioridad 2: Tempest (bloquea Dragon si está activo)
+    -- Prioridad 2: Boss Global
+    if bossGlobalEnabled and bossAliveCheckFn then
+        local alive = bossAliveCheckFn()
+        if alive and #alive > 0 then
+            return "BossGlobal"
+        end
+    end
+
+    -- Prioridad 3: Tempest (bloquea Dragon si está activo)
     if tempestEnabled then
         if now >= (reentryTimers["Tempest Invasion"] or 0) then
             return "Tempest Invasion"
         end
     end
 
-    -- Prioridad 3: Dragon (solo si Tempest NO está activo)
+    -- Prioridad 4: Dragon (solo si Tempest NO está activo)
     if dragonEnabled and not tempestEnabled then
         if now >= (reentryTimers["Dragon Defense"] or 0) then
             return "Dragon Defense"
@@ -428,7 +443,7 @@ end
 -- ─── Scheduler ────────────────────────────────────────────────────────────────
 
 local function anyToggleOn()
-    return trialEnabled or tempestEnabled or dragonEnabled
+    return trialEnabled or tempestEnabled or dragonEnabled or bossGlobalEnabled
 end
 
 local function ensureSchedulerRunning()
@@ -442,39 +457,47 @@ local function ensureSchedulerRunning()
             local activity = getHighestPriorityActivity()
 
             if activity == nil then
-                -- Nada que hacer (cooldown o no hay trial abierto)
+                -- Nada que hacer → resumir autofarm
                 if autoFarmPaused then
                     resumeAutoFarm()
                 end
                 task.wait(2)
+            elseif activity == "BossGlobal" then
+                -- Boss Global: pausar autofarm, ejecutar ciclo, resumir
+                print("[SCHEDULER] Boss Global alive → ejecutando farm")
+                pauseAutoFarm()
+                if bossFarmCallback then
+                    bossFarmCallback(function()
+                        return bossGlobalEnabled and not hasHigherPriorityTrial()
+                    end)
+                end
+                resumeAutoFarm()
+                task.wait(1.5)
             else
-                -- Intentar unirse
+                -- Gamemode: intentar unirse
                 print("[SCHEDULER] Trying to join: " .. activity)
                 fireJoin(activity)
                 local entered = waitForEntry(activity)
 
                 if entered then
-                    -- Pausar autofarm SOLO después de confirmar entrada
                     pauseAutoFarm()
+                    task.wait(1.5)
 
                     local waveTarget = getWaveTargetFor(activity)
                     local finished, interrupted, entryTime = runGamemode(
                         activity, waveTarget, savedPositionRef
                     )
 
-                    -- Resumir autofarm al salir del gamemode
-                    resumeAutoFarm()
+                    -- Al salir del gamemode, NO resumir autofarm aquí
+                    -- El scheduler volverá al loop y chequeará Boss Global primero
 
-                    -- Guardar timer de re-entry si terminó naturalmente
                     if finished then
                         reentryTimers[activity] = entryTime + getEnterTime(activity)
                         print("[SCHEDULER] Re-entry timer para " .. activity .. ": " .. getEnterTime(activity) .. "s")
                         task.wait(2)
                     elseif interrupted then
-                        -- Fue interrumpido, no guardar cooldown largo, volver al loop rápido
                         task.wait(1)
                     else
-                        -- Toggle fue apagado, continuar loop (se saldrá si no hay más toggles)
                         task.wait(0.5)
                     end
                 else
@@ -559,8 +582,23 @@ function GameMode:IsInGamemode()
 end
 
 function GameMode:SetBossAutoFarm(active)
-    bossAutoFarmActive = active
-    print("[BOSS-DBG] GameMode.bossAutoFarmActive = " .. tostring(active))
+    -- Legacy compat: activa/desactiva boss global
+    bossGlobalEnabled = active
+end
+
+function GameMode:StartBossGlobal(aliveCheckFn, farmCallback)
+    bossAliveCheckFn = aliveCheckFn
+    bossFarmCallback = farmCallback
+    bossGlobalEnabled = true
+    print("[SCHEDULER] BossGlobal started")
+    ensureSchedulerRunning()
+end
+
+function GameMode:StopBossGlobal()
+    bossGlobalEnabled = false
+    bossAliveCheckFn = nil
+    bossFarmCallback = nil
+    print("[SCHEDULER] BossGlobal stopped")
 end
 
 return GameMode
