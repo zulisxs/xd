@@ -1220,32 +1220,51 @@ local FarmBoss = Main:Toggle({
                     -- 1. Recolectar TODOS los bosses alive
                     local aliveBosses = {}
 
-                    -- Extraer nombres (soporta array {"Yuje"} y dict {["Yuje"]=true})
+                    -- Extraer nombres (soporta array y dict)
                     local bossNames = {}
                     for k, v in pairs(BossesElegidos) do
                         if type(k) == "number" then
-                            table.insert(bossNames, v) -- array
+                            table.insert(bossNames, v)
                         elseif type(k) == "string" and v then
-                            table.insert(bossNames, k) -- dictionary
+                            table.insert(bossNames, k)
                         end
                     end
 
+                    -- Verificar timers desde templates
                     for _, bossName in ipairs(bossNames) do
-                        local bossFolder = templates:FindFirstChild(bossName)
-                        if not bossFolder then
-                            print("[BOSS] Template no encontrado: " .. bossName)
-                            continue
-                        end
-                        local hud = bossFolder:FindFirstChild("HUD")
-                        if not hud then continue end
-                        local timeLabel = hud:FindFirstChild("Time")
-                        if not timeLabel then continue end
+                        if not bossAutoFarmActive then break end
 
-                        local timerText = timeLabel.Text
-                        local tiempo = textoASegundos(timerText)
-                        print("[BOSS] " .. bossName .. " timer: '" .. timerText .. "' = " .. tiempo .. "s")
-                        if tiempo <= 0 then
-                            table.insert(aliveBosses, bossName)
+                        local bossFolder = templates:FindFirstChild(bossName)
+
+                        -- Si template no existe, viajar para cargarlo
+                        if not bossFolder then
+                            print("[BOSS] Template '" .. bossName .. "' no cargado, viajando...")
+                            local info = InfoBoss[bossName]
+                            if info then
+                                fireTeleport(info.MapName, info.ZoneIndex)
+                                task.wait(3)
+                                if BossCFrames[bossName] then
+                                    local hrp = workspace:FindFirstChild(LocalPlayer.Name)
+                                        and workspace[LocalPlayer.Name]:FindFirstChild("HumanoidRootPart")
+                                    if hrp then
+                                        hrp.CFrame = BossCFrames[bossName] + Vector3.new(0, 10, 0)
+                                    end
+                                    task.wait(2)
+                                end
+                                bossFolder = templates:FindFirstChild(bossName)
+                            end
+                        end
+
+                        if bossFolder then
+                            local hud = bossFolder:FindFirstChild("HUD")
+                            local timeLabel = hud and hud:FindFirstChild("Time")
+                            if timeLabel then
+                                local timerText = timeLabel.Text
+                                print("[BOSS] " .. bossName .. " timer: '" .. timerText .. "'")
+                                if timerText == "0s" then
+                                    table.insert(aliveBosses, bossName)
+                                end
+                            end
                         end
                     end
 
