@@ -977,8 +977,9 @@ end
 -- ─── Funciones de tiempo ──────────────────────────────────────────────────
 local function textoASegundos(texto)
     if texto == "0s" then return 0 end
-    local minutos  = tonumber(texto:match("(%d+)m")) or 0
-    local segundos = tonumber(texto:match("(%d+)s")) or 0
+    local lower = texto:lower()
+    local minutos  = tonumber(lower:match("(%d+)m")) or 0
+    local segundos = tonumber(lower:match("(%d+)s")) or 0
     return (minutos * 60) + segundos
 end
 
@@ -1257,45 +1258,45 @@ local FarmBoss = Main:Toggle({
             if not bossAutoFarmActive then return end
 
             -- ═══ LEER TEMPLATES UNA SOLA VEZ ═══
-            local bossTimers = {}
             for _, bossName in ipairs(bossNames) do
                 local bossFolder = templates:FindFirstChild(bossName)
                 if bossFolder then
                     local hud = bossFolder:FindFirstChild("HUD")
                     local timeLabel = hud and hud:FindFirstChild("Time")
                     if timeLabel then
-                        local timerText = timeLabel.Text
-                        bossTimers[bossName] = (timerText == "0s") and 0 or textoASegundos(timerText)
-                        print("[BOSS] " .. bossName .. " timer: '" .. timerText .. "' = " .. bossTimers[bossName] .. "s")
+                        print("[BOSS] " .. bossName .. " timer: '" .. timeLabel.Text .. "'")
                     end
                 else
                     print("[BOSS] " .. bossName .. " template no encontrado")
                 end
             end
 
-            -- Crear UI si no existe
+            -- Crear UI si no existe (UI hace su propio countdown)
             if not frames:FindFirstChild("BossTimer") then
                 crearUI()
             end
 
-            -- Countdown paralelo
-            local countdownThread = task.spawn(function()
-                while bossAutoFarmActive do
-                    task.wait(1)
-                    for name, t in pairs(bossTimers) do
-                        if t > 0 then
-                            bossTimers[name] = t - 1
-                        end
-                    end
-                end
-            end)
+            -- Función helper: leer timer desde UI BossTimer
+            local function getUITimer(bossName)
+                local bossTimerFrame = frames:FindFirstChild("BossTimer")
+                if not bossTimerFrame then return nil end
+                local fondo = bossTimerFrame:FindFirstChild("ImageLabel")
+                if not fondo then return nil end
+                local bossLabel = fondo:FindFirstChild(bossName)
+                if not bossLabel then return nil end
+                local timerLabel = bossLabel:FindFirstChild("Timer")
+                if not timerLabel then return nil end
+                return timerLabel.Text
+            end
 
             -- ═══ LOOP PRINCIPAL ═══
             task.spawn(function()
                 while bossAutoFarmActive do
+                    -- Leer timers desde la UI
                     local aliveBosses = {}
                     for _, bossName in ipairs(bossNames) do
-                        if bossTimers[bossName] and bossTimers[bossName] <= 0 then
+                        local uiText = getUITimer(bossName)
+                        if uiText and uiText == "Boss Alive" then
                             table.insert(aliveBosses, bossName)
                         end
                     end
@@ -1351,15 +1352,28 @@ local FarmBoss = Main:Toggle({
                             end
                             task.wait(1)
 
-                            -- 3. Verificar templates.Time == "0s"
+                            -- 3. Verificar templates.Time == "0s" (con espera si faltan pocos segundos)
                             local bossFolder = templates:FindFirstChild(bossName)
                             local isAlive = false
                             if bossFolder then
                                 local hud = bossFolder:FindFirstChild("HUD")
                                 local tl = hud and hud:FindFirstChild("Time")
                                 if tl then
-                                    isAlive = (tl.Text == "0s")
-                                    print("[BOSS] " .. bossName .. " check: '" .. tl.Text .. "' → " .. (isAlive and "VIVO" or "MUERTO"))
+                                    local timerText = tl.Text
+                                    local remaining = textoASegundos(timerText)
+                                    print("[BOSS] " .. bossName .. " check: '" .. timerText .. "' (" .. remaining .. "s)")
+
+                                    -- Si faltan pocos segundos, esperar y re-verificar
+                                    if remaining > 0 and remaining <= 10 then
+                                        print("[BOSS] " .. bossName .. " faltan " .. remaining .. "s, esperando...")
+                                        task.wait(remaining + 1)
+                                        timerText = tl.Text
+                                        remaining = textoASegundos(timerText)
+                                        print("[BOSS] " .. bossName .. " re-check: '" .. timerText .. "'")
+                                    end
+
+                                    isAlive = (timerText == "0s")
+                                    print("[BOSS] " .. bossName .. " → " .. (isAlive and "VIVO" or "MUERTO"))
                                 end
                             end
 
@@ -1386,26 +1400,24 @@ local FarmBoss = Main:Toggle({
                                     print("[BOSS] " .. bossName .. " killed!")
                                 end
 
-                                -- 5. Re-leer timer
+                                -- 5. Re-leer timer después de matar
                                 task.wait(3)
                                 local nf = templates:FindFirstChild(bossName)
                                 if nf then
                                     local h = nf:FindFirstChild("HUD")
                                     local t = h and h:FindFirstChild("Time")
                                     if t then
-                                        bossTimers[bossName] = textoASegundos(t.Text)
-                                        print("[BOSS] " .. bossName .. " nuevo timer: " .. bossTimers[bossName] .. "s")
+                                        print("[BOSS] " .. bossName .. " nuevo timer: '" .. t.Text .. "'")
                                     end
                                 end
                             else
-                                bossTimers[bossName] = 999
-                                print("[BOSS] " .. bossName .. " ya muerto, timer reset")
+                                print("[BOSS] " .. bossName .. " ya muerto, skip")
                             end
 
                             Functions:SetFloating(false)
                         end
 
-                        -- Refrescar UI
+                        -- Refrescar UI con nuevos timers
                         crearUI()
 
                         -- Volver
@@ -1429,7 +1441,6 @@ local FarmBoss = Main:Toggle({
 
                     task.wait(2)
                 end
-                task.cancel(countdownThread)
             end)
         else
             limpiarUI()
