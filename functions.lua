@@ -126,19 +126,24 @@ local function killLoop(selectedEnemies, priority, isRunningFn)
         local firstEnemy = enemyList[1].instance
         local firstEnemyRespawnTime = nil
 
-        -- Watcher paralelo: detecta el momento exacto en que enemy 1 respawnea
+        -- Watcher paralelo: detecta cuando enemy 1 respawnea (mismo BasePart siempre)
         local watcher = task.spawn(function()
-            -- Esperar a que muera (Died = true)
-            while firstEnemy and firstEnemy.Parent and not firstEnemy:GetAttribute("Died") do
+            -- Esperar a que muera (Died=true O Health<=0)
+            while firstEnemy and firstEnemy.Parent do
+                local died = firstEnemy:GetAttribute("Died")
+                local hp = firstEnemy:GetAttribute("Health") or 0
+                if died or hp <= 0 then break end
                 task.wait(0.05)
             end
-            -- Esperar a que respawnee (Died = false)
-            while firstEnemy and firstEnemy.Parent and firstEnemy:GetAttribute("Died") do
+            -- Esperar a que respawnee (Died=false Y Health>0)
+            while firstEnemy and firstEnemy.Parent do
+                local died = firstEnemy:GetAttribute("Died")
+                local hp = firstEnemy:GetAttribute("Health") or 0
+                if not died and hp > 0 then
+                    firstEnemyRespawnTime = tick()
+                    return
+                end
                 task.wait(0.05)
-            end
-            -- Registrar momento exacto del respawn
-            if firstEnemy and firstEnemy.Parent then
-                firstEnemyRespawnTime = tick()
             end
         end)
 
@@ -156,8 +161,14 @@ local function killLoop(selectedEnemies, priority, isRunningFn)
             if finalDamage >= enemyHealth then
                 task.wait(0.3)
             else
+                -- Esperar muerte con timeout de 30s
+                local waitStart = tick()
                 while isRunningFn() and isEnemyAlive(enemy) do
                     task.wait(0.1)
+                    if tick() - waitStart > 30 then
+                        print("[FARM-DBG] Timeout 30s esperando muerte de " .. enemy.Name .. ", skipping")
+                        break
+                    end
                 end
                 task.wait(0.3)
             end
@@ -171,9 +182,14 @@ local function killLoop(selectedEnemies, priority, isRunningFn)
         -- Si la lista terminó pero enemy 1 aún no está listo, esperar
         if isRunningFn() then
             if not firstEnemyRespawnTime then
-                -- Aún no respawneó, esperar
+                -- Aún no respawneó, esperar con timeout de 15s
+                local waitStart = tick()
                 while isRunningFn() and not firstEnemyRespawnTime do
                     task.wait(0.1)
+                    if tick() - waitStart > 15 then
+                        print("[FARM-DBG] Timeout 15s esperando respawn de enemy 1, reiniciando ciclo")
+                        break
+                    end
                 end
             end
             -- Esperar cooldown restante
