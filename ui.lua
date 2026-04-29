@@ -1130,6 +1130,74 @@ local function crearUI()
         end)
     end
 end
+
+-- Reinicia SOLO el contador de un boss específico sin destruir la UI
+local function reiniciarContador(nombreBoss)
+    print("[BOSS-DBG] reiniciarContador: " .. nombreBoss)
+    -- 1. Buscar el timerLabel existente en la UI
+    local bossTimerFrame = frames:FindFirstChild("BossTimer")
+    if not bossTimerFrame then
+        print("[BOSS-DBG] reiniciarContador: BossTimer frame no existe")
+        return
+    end
+    local fondo = bossTimerFrame:FindFirstChild("ImageLabel")
+    if not fondo then
+        print("[BOSS-DBG] reiniciarContador: ImageLabel no existe")
+        return
+    end
+    local bossLabel = fondo:FindFirstChild(nombreBoss)
+    if not bossLabel then
+        print("[BOSS-DBG] reiniciarContador: Label '" .. nombreBoss .. "' no existe")
+        return
+    end
+    local timerLabel = bossLabel:FindFirstChild("Timer")
+    if not timerLabel then
+        print("[BOSS-DBG] reiniciarContador: Timer label no existe")
+        return
+    end
+
+    -- 2. Leer nuevo tiempo desde templates
+    local bossFolder = templates:FindFirstChild(nombreBoss)
+    if not bossFolder then
+        print("[BOSS-DBG] reiniciarContador: template '" .. nombreBoss .. "' no encontrado")
+        return
+    end
+    local hud = bossFolder:FindFirstChild("HUD")
+    local timeObj = hud and hud:FindFirstChild("Time")
+    if not timeObj then
+        print("[BOSS-DBG] reiniciarContador: HUD/Time no encontrado")
+        return
+    end
+    local nuevoTiempo = textoASegundos(timeObj.Text)
+    print("[BOSS-DBG] reiniciarContador: " .. nombreBoss .. " nuevo tiempo: '" .. timeObj.Text .. "' = " .. nuevoTiempo .. "s")
+
+    -- 3. Cancelar contador viejo
+    if contadores[nombreBoss] then
+        task.cancel(contadores[nombreBoss])
+        contadores[nombreBoss] = nil
+    end
+
+    -- 4. Arrancar contador nuevo
+    if nuevoTiempo <= 0 then
+        timerLabel.Text = "Boss Alive"
+        timerLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+    else
+        timerLabel.Text = segundosATexto(nuevoTiempo)
+        timerLabel.TextColor3 = Color3.fromRGB(255, 220, 0)
+        contadores[nombreBoss] = task.spawn(function()
+            local t = nuevoTiempo
+            while t > 0 do
+                task.wait(1)
+                t = t - 1
+                timerLabel.Text = segundosATexto(t)
+                if t <= 0 then
+                    timerLabel.Text = "Boss Alive"
+                    timerLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+                end
+            end
+        end)
+    end
+end
 local BossSection = Main:Section({ 
     Title = "Global Bosses",
 })
@@ -1198,13 +1266,7 @@ local BossCFrames = {
     ["Sakana"] = CFrame.new(10572.9756, 659.354675, -5189.31104, 1, 0, 0, 0, 1, 0, 0, 0, 1),
     ["Satoro"] = CFrame.new(10810.6367, 659.341309, -5019.60352, 0.682592869, 0, 0.73079896, 0, 1, 0, -0.73079896, 0, 0.682592869),
     ["Yuje"]   = CFrame.new(10873.502, 773.154114, -5159.50684, -1.1920929e-07, 0, 1.00000012, 0, 1, 0, -1.00000012, 0, -1.1920929e-07),
-}
-
-local function isGlobalBossAlive(boss)
-    if boss == nil or boss.Parent == nil then return false end
-    local health = boss:GetAttribute("Health") or 0
-    return health > 0
-end
+}\n
 
 local LocalPlayer = game:GetService("Players").LocalPlayer
 
@@ -1418,53 +1480,30 @@ local FarmBoss = Main:Toggle({
                             end
 
                             if isAlive then
-                                -- 4. Buscar BasePart y esperar muerte
-                                local bossEnemyFolder = workspace:FindFirstChild("Server")
-                                    and workspace.Server:FindFirstChild("Enemies")
-                                    and workspace.Server.Enemies:FindFirstChild("Global Bosses")
-                                print("[BOSS-DBG] bossEnemyFolder: " .. tostring(bossEnemyFolder))
-                                local boss = nil
-                                if bossEnemyFolder then
-                                    print("[BOSS-DBG] Hijos en Global Bosses folder:")
-                                    for _, e in ipairs(bossEnemyFolder:GetChildren()) do
-                                        print("[BOSS-DBG]   " .. e.ClassName .. " '" .. e.Name .. "' Parent=" .. tostring(e.Parent ~= nil))
-                                        if e:IsA("BasePart") and e.Name == bossName then
-                                            boss = e
+                                -- 4. Esperar a que muera (templates.Time deje de ser "0s")
+                                print("[BOSS] " .. bossName .. " VIVO → esperando muerte...")
+                                while bossAutoFarmActive do
+                                    task.wait(0.5)
+                                    local bf = templates:FindFirstChild(bossName)
+                                    if bf then
+                                        local h = bf:FindFirstChild("HUD")
+                                        local t = h and h:FindFirstChild("Time")
+                                        if t and t.Text ~= "0s" then
+                                            print("[BOSS] " .. bossName .. " killed! Nuevo timer: '" .. t.Text .. "'")
                                             break
                                         end
                                     end
                                 end
 
-                                if boss then
-                                    print("[BOSS] " .. bossName .. " BasePart encontrado → esperando muerte...")
-                                    while bossAutoFarmActive and boss.Parent ~= nil do
-                                        task.wait(0.1)
-                                    end
-                                    print("[BOSS] " .. bossName .. " killed!")
-                                else
-                                    print("[BOSS-DBG] " .. bossName .. " BasePart NO encontrado en folder!")
-                                end
-
-                                -- 5. Re-leer timer después de matar
-                                task.wait(3)
-                                local nf = templates:FindFirstChild(bossName)
-                                if nf then
-                                    local h = nf:FindFirstChild("HUD")
-                                    local t = h and h:FindFirstChild("Time")
-                                    if t then
-                                        print("[BOSS] " .. bossName .. " nuevo timer: '" .. t.Text .. "'")
-                                    end
-                                end
+                                -- 5. Actualizar solo este boss en la UI
+                                task.wait(1)
+                                reiniciarContador(bossName)
                             else
                                 print("[BOSS] " .. bossName .. " ya muerto, skip")
                             end
 
                             Functions:SetFloating(false)
                         end
-
-                        -- Refrescar UI con nuevos timers
-                        print("[BOSS-DBG] Refrescando UI...")
-                        crearUI()
 
                         -- Volver
                         print("[BOSS-DBG] Volviendo a " .. tostring(returnMap) .. " zona " .. tostring(returnZone))
