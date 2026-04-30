@@ -1510,9 +1510,9 @@ local UIBoss = Main:Toggle({
     Loadouts:Space() 
 
     Loadouts:Toggle({
-        Title    = "Auto Potions",
-        Desc     = "Enable potion system for all gamemodes",
-        Icon     = "flask-conical",
+        Title    = "Auto Loadouts",
+        Desc     = "Enable Loadouts system",
+        Icon     = "check",
         Type     = "Checkbox",
         Value    = false,
         Callback = function(state)
