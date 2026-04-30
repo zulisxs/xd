@@ -4,7 +4,7 @@ local RepStorage = game:GetService("ReplicatedStorage")
 -- Al inicio del archivo
 local Omni = require(game:GetService("ReplicatedStorage"):WaitForChild("Omni"))
 local PlayerStats = Omni.Utils.PlayerStats
-local BRIDGE_NET  = RepStorage:WaitForChild("BridgeNet"):WaitForChild("dataRemoteEvent")  -- ← falta esto
+local BRIDGE_NET  = RepStorage:WaitForChild("BridgeNet"):WaitForChild("dataRemoteEvent") 
 
 local autoFarmRunning = false
 
