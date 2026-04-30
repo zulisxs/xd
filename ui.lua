@@ -1511,7 +1511,7 @@ local UIBoss = Main:Toggle({
 
     Loadouts:Toggle({
         Title    = "Auto Potions",
-        Desc     = "Activa el sistema de pociones para todos los gamemodes",
+        Desc     = "Enable potion system for all gamemodes",
         Icon     = "flask-conical",
         Type     = "Checkbox",
         Value    = false,
@@ -1521,8 +1521,8 @@ local UIBoss = Main:Toggle({
     })
 
     Loadouts:Toggle({
-        Title    = "Pausar pociones al salir",
-        Desc     = "ON: pausa al salir y reanuda al entrar | OFF: modo simple",
+        Title    = "Pause potions on exit",
+        Desc     = "ON: pause on exit & resume on entry | OFF: simple mode",
         Icon     = "pause",
         Type     = "Checkbox",
         Value    = false,
@@ -1542,8 +1542,8 @@ local UIBoss = Main:Toggle({
     local GlobalBosses = Loadouts:Section({ Title = "Global Bosses",TextXAlignment ="Left" })
     
     Loadouts:Dropdown({
-        Title            = "Pociones",
-        Desc             = "Pociones a usar al entrar al Global Boss",
+        Title            = "Potions",
+        Desc             = "Potions to use when entering Global Boss",
         Values           = ListPotsInGame,
         Multi            = true,
         SearchBarEnabled = true,
@@ -1553,8 +1553,8 @@ local UIBoss = Main:Toggle({
         end,
     })
     Loadouts:Dropdown({
-        Title     = "Equip al entrar",
-        Desc      = "Equipar el mejor al inicio del Global Boss",
+        Title     = "Equip on entry",
+        Desc      = "Equip best on Global Boss start",
         Values    = EquipBetter,
         Multi     = false,
         AllowNone = true,
@@ -1563,8 +1563,8 @@ local UIBoss = Main:Toggle({
         end,
     })
     Loadouts:Dropdown({
-        Title     = "Equip al salir",
-        Desc      = "Equipar el mejor al finalizar el Global Boss",
+        Title     = "Equip on exit",
+        Desc      = "Equip best on Global Boss finish",
         Values    = EquipBetter,
         Multi     = false,
         AllowNone = true,
@@ -1576,8 +1576,8 @@ local UIBoss = Main:Toggle({
     local TrialSection = Loadouts:Section({ Title = "Trial",TextXAlignment ="Left" })
     
     Loadouts:Dropdown({
-        Title            = "Pociones",
-        Desc             = "Pociones a usar al entrar al Trial",
+        Title            = "Potions",
+        Desc             = "Potions to use when entering Trial",
         Values           = ListPotsInGame,
         Multi            = true,
         SearchBarEnabled = true,
@@ -1587,8 +1587,8 @@ local UIBoss = Main:Toggle({
         end,
     })
     Loadouts:Dropdown({
-        Title     = "Equip al entrar",
-        Desc      = "Equipar el mejor al inicio del Trial",
+        Title     = "Equip on entry",
+        Desc      = "Equip best on Trial start",
         Values    = EquipBetter,
         Multi     = false,
         AllowNone = true,
@@ -1597,8 +1597,8 @@ local UIBoss = Main:Toggle({
         end,
     })
     Loadouts:Dropdown({
-        Title     = "Equip al salir",
-        Desc      = "Equipar el mejor al finalizar el Trial",
+        Title     = "Equip on exit",
+        Desc      = "Equip best on Trial finish",
         Values    = EquipBetter,
         Multi     = false,
         AllowNone = true,
@@ -1609,8 +1609,8 @@ local UIBoss = Main:Toggle({
     Loadouts:Divider() 
     local TempestSection = Loadouts:Section({ Title = "Tempest Invasion",TextXAlignment ="Left" })
     Loadouts:Dropdown({
-        Title            = "Pociones",
-        Desc             = "Pociones a usar al entrar al Tempest",
+        Title            = "Potions",
+        Desc             = "Potions to use when entering Tempest",
         Values           = ListPotsInGame,
         Multi            = true,
         SearchBarEnabled = true,
@@ -1620,8 +1620,8 @@ local UIBoss = Main:Toggle({
         end,
     })
     Loadouts:Dropdown({
-        Title     = "Equip al entrar",
-        Desc      = "Equipar el mejor al inicio del Tempest",
+        Title     = "Equip on entry",
+        Desc      = "Equip best on Tempest start",
         Values    = EquipBetter,
         Multi     = false,
         AllowNone = true,
@@ -1630,8 +1630,8 @@ local UIBoss = Main:Toggle({
         end,
     })
     Loadouts:Dropdown({
-        Title     = "Equip al salir",
-        Desc      = "Equipar el mejor al finalizar el Tempest",
+        Title     = "Equip on exit",
+        Desc      = "Equip best on Tempest finish",
         Values    = EquipBetter,
         Multi     = false,
         AllowNone = true,
@@ -1643,8 +1643,8 @@ local UIBoss = Main:Toggle({
     Loadouts:Divider()
     local DefenseDragonSection = Loadouts:Section({ Title = "Dragon Defense",TextXAlignment ="Left" }) 
     Loadouts:Dropdown({
-        Title            = "Pociones",
-        Desc             = "Pociones a usar al entrar al Dragon",
+        Title            = "Potions",
+        Desc             = "Potions to use when entering Dragon",
         Values           = ListPotsInGame,
         Multi            = true,
         SearchBarEnabled = true,
@@ -1654,8 +1654,8 @@ local UIBoss = Main:Toggle({
         end,
     })
     Loadouts:Dropdown({
-        Title     = "Equip al entrar",
-        Desc      = "Equipar el mejor al inicio del Dragon",
+        Title     = "Equip on entry",
+        Desc      = "Equip best on Dragon start",
         Values    = EquipBetter,
         Multi     = false,
         AllowNone = true,
@@ -1664,8 +1664,8 @@ local UIBoss = Main:Toggle({
         end,
     })
     Loadouts:Dropdown({
-        Title     = "Equip al salir",
-        Desc      = "Equipar el mejor al finalizar el Dragon",
+        Title     = "Equip on exit",
+        Desc      = "Equip best on Dragon finish",
         Values    = EquipBetter,
         Multi     = false,
         AllowNone = true,
