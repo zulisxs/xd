@@ -290,4 +290,115 @@ function Functions:SetAutoFarm(state, selectedEnemies, priority)
         Functions:SetFloating(false)  -- ← aquí
     end
 end
+local Functions = {}
+local Players    = game:GetService("Players")
+local RepStorage = game:GetService("ReplicatedStorage")
+local Omni       = require(game:GetService("ReplicatedStorage"):WaitForChild("Omni"))
+local BRIDGE_NET = RepStorage:WaitForChild("BridgeNet"):WaitForChild("dataRemoteEvent")
+local globalPauseMode = false
+
+-- ─── PotionSystem ─────────────────────────────────────────────────────────────
+
+local globalPauseMode = false  -- ← declarar arriba del todo
+local globalPotsEnabled = false  -- ← master toggle
+
+local PotionSystemClass = {}
+PotionSystemClass.__index = PotionSystemClass
+
+function PotionSystemClass.new()
+    local self = setmetatable({}, PotionSystemClass)
+    self.selectedPots  = {}
+    self.equipOnStart  = nil
+    self.equipOnFinish = nil
+    return self
+end
+
+function PotionSystemClass:SetSelectedPots(pots)   self.selectedPots  = pots or {} end
+function PotionSystemClass:SetEquipOnStart(option)  self.equipOnStart  = option    end
+function PotionSystemClass:SetEquipOnFinish(option) self.equipOnFinish = option    end
+
+function PotionSystemClass:HandlePotions(isPauseMode, shouldPause)
+    for _, potName in ipairs(self.selectedPots) do
+        local potions = Omni.Data.Inventory.Potions
+        if not potions[potName] or potions[potName] <= 0 then
+            print("[POTS] No disponible en inventario: " .. potName)
+            continue
+        end
+
+        local inUse, isPaused = false, false
+        for _, pot in pairs(Omni.Data.UsedPotions) do
+            if pot.Name == potName then
+                inUse    = true
+                isPaused = pot.Paused
+                break
+            end
+        end
+
+        if isPauseMode then
+            if shouldPause then
+                if inUse and not isPaused then
+                    print("[POTS] Pausando al salir: " .. potName)
+                    BRIDGE_NET:FireServer(unpack({{{ "General", "Items", "PausePotion", potName, n = 4 }, "\002" }}))
+                end
+            else
+                if inUse and isPaused then
+                    print("[POTS] Reanudando al entrar: " .. potName)
+                    BRIDGE_NET:FireServer(unpack({{{ "General", "Items", "PausePotion", potName, n = 4 }, "\002" }}))
+                elseif not inUse then
+                    print("[POTS] Usando nueva al entrar: " .. potName)
+                    BRIDGE_NET:FireServer(unpack({{{ "General", "Items", "UsePotion", potName, 1, n = 5 }, "\002" }}))
+                end
+            end
+        else
+            if inUse and isPaused then
+                print("[POTS] Reanudando (modo simple): " .. potName)
+                BRIDGE_NET:FireServer(unpack({{{ "General", "Items", "PausePotion", potName, n = 4 }, "\002" }}))
+            elseif inUse and not isPaused then
+                print("[POTS] Ya activa: " .. potName)
+            else
+                print("[POTS] Usando nueva (modo simple): " .. potName)
+                BRIDGE_NET:FireServer(unpack({{{ "General", "Items", "UsePotion", potName, 1, n = 5 }, "\002" }}))
+            end
+        end
+
+        task.wait(0.3)
+    end
+end
+
+function PotionSystemClass:IsReady()
+    -- No tiene pociones seleccionadas ni equip → ignorar
+    return #self.selectedPots > 0 or self.equipOnStart ~= nil or self.equipOnFinish ~= nil
+end
+
+function PotionSystemClass:OnStart()
+    if not globalPotsEnabled then return end  -- master toggle off → ignorar
+    if not self:IsReady() then return end     -- nada configurado → ignorar
+    self:HandlePotions(globalPauseMode, false)
+    task.wait(0.3)
+    if self.equipOnStart then
+        BRIDGE_NET:FireServer(unpack({{{ "General", "Inventory", "EquipBest", self.equipOnStart, n = 4 }, "\002" }}))
+    end
+end
+
+function PotionSystemClass:OnFinish()
+    if not globalPotsEnabled then return end  -- master toggle off → ignorar
+    if not self:IsReady() then return end     -- nada configurado → ignorar
+    self:HandlePotions(globalPauseMode, true)
+    if self.equipOnFinish then
+        BRIDGE_NET:FireServer(unpack({{{ "General", "Inventory", "EquipBest", self.equipOnFinish, n = 4 }, "\002" }}))
+    end
+end
+
+function Functions:SetGlobalPotsEnabled(state)
+    globalPotsEnabled = state
+end
+
+function Functions:SetGlobalPauseMode(state)
+    globalPauseMode = state
+end
+
+function Functions:NewPotionSystem()
+    return PotionSystemClass.new()
+end
+
 return Functions

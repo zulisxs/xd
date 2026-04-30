@@ -15,6 +15,7 @@ local functionsRef    = nil
 local savedEnemies    = nil
 local savedPriority   = nil
 local savedPositionRef = nil
+local potionSystems   = nil  -- {trial, tempest, dragon, globalBosses}
 
 -- Boss Global
 local bossGlobalEnabled = false
@@ -365,12 +366,24 @@ end
 
 -- ─── Run gamemode ─────────────────────────────────────────────────────────────
 
+local function getPotionSystemFor(gamemodeName)
+    if not potionSystems then return nil end
+    if gamemodeName:find("Trial") then return potionSystems.trial end
+    if gamemodeName == "Tempest Invasion" then return potionSystems.tempest end
+    if gamemodeName == "Dragon Defense" then return potionSystems.dragon end
+    return nil
+end
+
 local function runGamemode(gamemodeName, waveTarget, savedPosition)
     local savedMap  = (savedPosition and savedPosition.map) or Omni.Data.Map
     local savedZone = (savedPosition and savedPosition.zone) or Omni.Data.Zone
     local entryTime = workspace:GetServerTimeNow()
 
     currentGamemode = gamemodeName
+
+    -- Pociones al entrar
+    local pots = getPotionSystemFor(gamemodeName)
+    if pots then pots:OnStart() end
 
     local finished    = false
     local interrupted = false
@@ -430,6 +443,9 @@ local function runGamemode(gamemodeName, waveTarget, savedPosition)
     currentGamemode = nil
     if functionsRef then functionsRef:SetFloating(false) end
 
+    -- Pociones al salir
+    if pots then pots:OnFinish() end
+
     -- Teleport solo si terminó naturalmente o fue interrumpido (NO si toggle off)
     local toggleStillOn = isToggleOnFor(gamemodeName)
     if finished or interrupted then
@@ -466,11 +482,16 @@ local function ensureSchedulerRunning()
                 -- Boss Global: pausar autofarm, ejecutar ciclo, resumir
                 print("[SCHEDULER] Boss Global alive → ejecutando farm")
                 pauseAutoFarm()
+                -- Pociones al entrar
+                local bossPots = potionSystems and potionSystems.globalBosses
+                if bossPots then bossPots:OnStart() end
                 if bossFarmCallback then
                     bossFarmCallback(function()
                         return bossGlobalEnabled and not hasHigherPriorityTrial()
                     end)
                 end
+                -- Pociones al salir
+                if bossPots then bossPots:OnFinish() end
                 resumeAutoFarm()
                 task.wait(1.5)
             else
@@ -516,10 +537,11 @@ end
 
 -- ─── API pública ──────────────────────────────────────────────────────────────
 
-function GameMode:Init(functions, enemies, priority)
+function GameMode:Init(functions, enemies, priority, pots)
     functionsRef  = functions
     savedEnemies  = enemies
     savedPriority = priority
+    potionSystems = pots
 end
 
 function GameMode:UpdateAutoFarmParams(enemies, priority)

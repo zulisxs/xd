@@ -73,6 +73,7 @@ function UI:Init(WindUI, Functions, GameMode)
     local GameModeTab = Window:Tab({ Title = "Game Modes", Icon = "swords", IconThemed = true })
     local AutoRename = Window:Tab({Title  = "Auto Rename",Icon   = "pen-line",Locked = false,}) 
     local Accesories = Window:Tab({Title = "Accesories",Icon = "shirt",Locked = false,})
+    local Loadouts = Window:Tab({Title = "Loadouts",Icon = "rocket",Locked = false,})
     
     Info:Select()
 
@@ -1498,7 +1499,186 @@ local UIBoss = Main:Toggle({
         end
     end
 }) 
+    -- ─── Instancias PotionSystem por gamemode ─────────────────────────────────
+    local trialPots   = Functions:NewPotionSystem()
+    local tempestPots = Functions:NewPotionSystem()
+    local dragonPots  = Functions:NewPotionSystem()
+    local bossesPots  = Functions:NewPotionSystem()
+    local SectionGeneral = Loadouts:Section({ Title = "Loadouts",TextXAlignment ="Center" })
+    Loadouts:Select()
+    Loadouts:Divider()
+    Loadouts:Space() 
 
+    Loadouts:Toggle({
+        Title    = "Auto Potions",
+        Desc     = "Activa el sistema de pociones para todos los gamemodes",
+        Icon     = "flask-conical",
+        Type     = "Checkbox",
+        Value    = false,
+        Callback = function(state)
+       Functions:SetGlobalPotsEnabled(state)
+        end,
+    })
+
+    Loadouts:Toggle({
+        Title    = "Pausar pociones al salir",
+        Desc     = "ON: pausa al salir y reanuda al entrar | OFF: modo simple",
+        Icon     = "pause",
+        Type     = "Checkbox",
+        Value    = false,
+        Callback = function(state)
+       Functions:SetGlobalPauseMode(state)
+        end,
+    })
+
+    -- ─── Tab Trial ────────────────────────────────────────────────────────────
+    EquipBetter = {"Power","Damage","Drop","Crystals","Luck"}
+    ListPotsInGame = {}
+    PotsInGameSelect = {}
+    local PotInGame = require(game:GetService("ReplicatedStorage").Omni.Shared.Items.Potion)
+      for _, v2 in pairs (PotInGame) do
+      table.insert(ListPotsInGame, v2.Name)
+    end
+    local GlobalBosses = Loadouts:Section({ Title = "Global Bosses",TextXAlignment ="Left" })
+    
+    Loadouts:Dropdown({
+        Title            = "Pociones",
+        Desc             = "Pociones a usar al entrar al Global Boss",
+        Values           = ListPotsInGame,
+        Multi            = true,
+        SearchBarEnabled = true,
+        AllowNone        = true,
+        Callback         = function(option)
+       bossesPots:SetSelectedPots(option)
+        end,
+    })
+    Loadouts:Dropdown({
+        Title     = "Equip al entrar",
+        Desc      = "Equipar el mejor al inicio del Global Boss",
+        Values    = EquipBetter,
+        Multi     = false,
+        AllowNone = true,
+        Callback  = function(option)
+       bossesPots:SetEquipOnStart(option)
+        end,
+    })
+    Loadouts:Dropdown({
+        Title     = "Equip al salir",
+        Desc      = "Equipar el mejor al finalizar el Global Boss",
+        Values    = EquipBetter,
+        Multi     = false,
+        AllowNone = true,
+        Callback  = function(option)
+       bossesPots:SetEquipOnFinish(option)
+        end,
+    })
+    Loadouts:Divider() 
+    local TrialSection = Loadouts:Section({ Title = "Trial",TextXAlignment ="Left" })
+    
+    Loadouts:Dropdown({
+        Title            = "Pociones",
+        Desc             = "Pociones a usar al entrar al Trial",
+        Values           = ListPotsInGame,
+        Multi            = true,
+        SearchBarEnabled = true,
+        AllowNone        = true,
+        Callback         = function(option)
+       trialPots:SetSelectedPots(option)
+        end,
+    })
+    Loadouts:Dropdown({
+        Title     = "Equip al entrar",
+        Desc      = "Equipar el mejor al inicio del Trial",
+        Values    = EquipBetter,
+        Multi     = false,
+        AllowNone = true,
+        Callback  = function(option)
+       trialPots:SetEquipOnStart(option)
+        end,
+    })
+    Loadouts:Dropdown({
+        Title     = "Equip al salir",
+        Desc      = "Equipar el mejor al finalizar el Trial",
+        Values    = EquipBetter,
+        Multi     = false,
+        AllowNone = true,
+        Callback  = function(option)
+       trialPots:SetEquipOnFinish(option)
+        end,
+    })
+    Loadouts:Divider() 
+    local TempestSection = Loadouts:Section({ Title = "Tempest Invasion",TextXAlignment ="Left" })
+    Loadouts:Dropdown({
+        Title            = "Pociones",
+        Desc             = "Pociones a usar al entrar al Tempest",
+        Values           = ListPotsInGame,
+        Multi            = true,
+        SearchBarEnabled = true,
+        AllowNone        = true,
+        Callback         = function(option)
+       tempestPots:SetSelectedPots(option)
+        end,
+    })
+    Loadouts:Dropdown({
+        Title     = "Equip al entrar",
+        Desc      = "Equipar el mejor al inicio del Tempest",
+        Values    = EquipBetter,
+        Multi     = false,
+        AllowNone = true,
+        Callback  = function(option)
+       tempestPots:SetEquipOnStart(option)
+        end,
+    })
+    Loadouts:Dropdown({
+        Title     = "Equip al salir",
+        Desc      = "Equipar el mejor al finalizar el Tempest",
+        Values    = EquipBetter,
+        Multi     = false,
+        AllowNone = true,
+        Callback  = function(option)
+       tempestPots:SetEquipOnFinish(option)
+        end,
+    })
+
+    Loadouts:Divider()
+    local DefenseDragonSection = Loadouts:Section({ Title = "Dragon Defense",TextXAlignment ="Left" }) 
+    Loadouts:Dropdown({
+        Title            = "Pociones",
+        Desc             = "Pociones a usar al entrar al Dragon",
+        Values           = ListPotsInGame,
+        Multi            = true,
+        SearchBarEnabled = true,
+        AllowNone        = true,
+        Callback         = function(option)
+       dragonPots:SetSelectedPots(option)
+        end,
+    })
+    Loadouts:Dropdown({
+        Title     = "Equip al entrar",
+        Desc      = "Equipar el mejor al inicio del Dragon",
+        Values    = EquipBetter,
+        Multi     = false,
+        AllowNone = true,
+        Callback  = function(option)
+            dragonPots:SetEquipOnStart(option)
+        end,
+    })
+    Loadouts:Dropdown({
+        Title     = "Equip al salir",
+        Desc      = "Equipar el mejor al finalizar el Dragon",
+        Values    = EquipBetter,
+        Multi     = false,
+        AllowNone = true,
+        Callback  = function(option)
+       dragonPots:SetEquipOnFinish(option)
+        end,
+    })
+    GameMode:Init(Functions, nil, nil, {
+        trial   = trialPots,
+        tempest = tempestPots,
+        dragon  = dragonPots,
+        globalBosses= bossesPots
+    })
 end
 
 return UI
