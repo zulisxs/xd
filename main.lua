@@ -1,3 +1,11 @@
+-- ─── Anti AFK ─────────────────────────────────────────────────────────────────
+local VirtualUser = game:GetService("VirtualUser")
+game:GetService("Players").LocalPlayer.Idled:Connect(function()
+    VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+    task.wait(1)
+    VirtualUser:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+end)
+
 local function safeLoad(url, name)
     local ok, content = pcall(function()
         return game:HttpGet(url)
@@ -30,12 +38,5 @@ if not Functions then warn("⛔ Functions no cargó") return end
 if not GameMode  then warn("⛔ GameMode no cargó")  return end
 if not UI        then warn("⛔ UI no cargó")        return end
 
--- ─── Anti AFK ─────────────────────────────────────────────────────────────────
-local VirtualUser = game:GetService("VirtualUser")
-game:GetService("Players").LocalPlayer.Idled:Connect(function()
-    VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
-    task.wait(1)
-    VirtualUser:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
-end)
 
 UI:Init(WindUI, Functions, GameMode)
