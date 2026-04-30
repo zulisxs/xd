@@ -334,7 +334,7 @@ GameModeTab:Toggle({
     Type     = "Checkbox",
     Value    = false,
     Callback = function(state)
-        GameMode:Init(Functions, selectedEnemies, selectedPriority)
+        GameMode:UpdateAutoFarmParams(selectedEnemies, selectedPriority)  -- ← solo actualiza enemies/priority
         if state then
             GameMode:StartTrial(trialWaveTargets, savedPosition, selectedTrials)
         else
@@ -367,13 +367,13 @@ GameModeTab:Toggle({
         Type     = "Checkbox",
         Value    = false,
         Callback = function(state)
-            GameMode:Init(Functions, selectedEnemies, selectedPriority)
-            if state then
-                GameMode:StartDragonDefense(defenseWaveTarget, savedPosition)
-            else
-                GameMode:StopDragonDefense()
-            end
-        end,
+        GameMode:UpdateAutoFarmParams(selectedEnemies, selectedPriority)
+        if state then
+            GameMode:StartDragonDefense(defenseWaveTarget, savedPosition)
+        else
+            GameMode:StopDragonDefense()
+        end
+    end,
     })
 
     -- ─── Tempest Invasion ─────────────────────────────────────────────────────
@@ -400,13 +400,13 @@ GameModeTab:Toggle({
         Type     = "Checkbox",
         Value    = false,
         Callback = function(state)
-            GameMode:Init(Functions, selectedEnemies, selectedPriority)
-            if state then
-                GameMode:StartTempest(tempestWaveTarget, savedPosition)
-            else
-                GameMode:StopTempest()
-            end
-        end,
+        GameMode:UpdateAutoFarmParams(selectedEnemies, selectedPriority)
+        if state then
+            GameMode:StartTempest(tempestWaveTarget, savedPosition)
+        else
+            GameMode:StopTempest()
+        end
+    end,
     })
 
     GameModeTab:Toggle({
@@ -1510,8 +1510,9 @@ local UIBoss = Main:Toggle({
     Loadouts:Space() 
 
     Loadouts:Toggle({
-        Title    = "Auto Loadouts",
-        Icon     = "check",
+        Title    = "Auto Potions",
+        Desc     = "Enable potion system for all gamemodes",
+        Icon     = "flask-conical",
         Type     = "Checkbox",
         Value    = false,
         Callback = function(state)
