@@ -1556,7 +1556,7 @@ local UIBoss = Main:Toggle({
         Title     = "Equip on entry",
         Desc      = "Equip best on Global Boss start",
         Values    = EquipBetter,
-        Multi     = false,
+        Multi     = true,
         AllowNone = true,
         Callback  = function(option)
        bossesPots:SetEquipOnStart(option)
@@ -1566,7 +1566,7 @@ local UIBoss = Main:Toggle({
         Title     = "Equip on exit",
         Desc      = "Equip best on Global Boss finish",
         Values    = EquipBetter,
-        Multi     = false,
+        Multi     = true,
         AllowNone = true,
         Callback  = function(option)
        bossesPots:SetEquipOnFinish(option)
@@ -1590,7 +1590,7 @@ local UIBoss = Main:Toggle({
         Title     = "Equip on entry",
         Desc      = "Equip best on Trial start",
         Values    = EquipBetter,
-        Multi     = false,
+        Multi     = true,
         AllowNone = true,
         Callback  = function(option)
        trialPots:SetEquipOnStart(option)
@@ -1600,7 +1600,7 @@ local UIBoss = Main:Toggle({
         Title     = "Equip on exit",
         Desc      = "Equip best on Trial finish",
         Values    = EquipBetter,
-        Multi     = false,
+        Multi     = true,
         AllowNone = true,
         Callback  = function(option)
        trialPots:SetEquipOnFinish(option)
@@ -1623,7 +1623,7 @@ local UIBoss = Main:Toggle({
         Title     = "Equip on entry",
         Desc      = "Equip best on Tempest start",
         Values    = EquipBetter,
-        Multi     = false,
+        Multi     = true,
         AllowNone = true,
         Callback  = function(option)
        tempestPots:SetEquipOnStart(option)
@@ -1657,7 +1657,7 @@ local UIBoss = Main:Toggle({
         Title     = "Equip on entry",
         Desc      = "Equip best on Dragon start",
         Values    = EquipBetter,
-        Multi     = false,
+        Multi     = true,
         AllowNone = true,
         Callback  = function(option)
             dragonPots:SetEquipOnStart(option)
@@ -1667,7 +1667,7 @@ local UIBoss = Main:Toggle({
         Title     = "Equip on exit",
         Desc      = "Equip best on Dragon finish",
         Values    = EquipBetter,
-        Multi     = false,
+        Multi     = true,
         AllowNone = true,
         Callback  = function(option)
        dragonPots:SetEquipOnFinish(option)
