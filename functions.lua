@@ -4,6 +4,8 @@ local RepStorage = game:GetService("ReplicatedStorage")
 -- Al inicio del archivo
 local Omni = require(game:GetService("ReplicatedStorage"):WaitForChild("Omni"))
 local PlayerStats = Omni.Utils.PlayerStats
+local BRIDGE_NET  = RepStorage:WaitForChild("BridgeNet"):WaitForChild("dataRemoteEvent")  -- ← falta esto
+
 local autoFarmRunning = false
 
 -- ─── Estado actual de mundo/zona ─────────────────────────────────────────────
@@ -290,17 +292,11 @@ function Functions:SetAutoFarm(state, selectedEnemies, priority)
         Functions:SetFloating(false)  -- ← aquí
     end
 end
-local Functions = {}
-local Players    = game:GetService("Players")
-local RepStorage = game:GetService("ReplicatedStorage")
-local Omni       = require(game:GetService("ReplicatedStorage"):WaitForChild("Omni"))
-local BRIDGE_NET = RepStorage:WaitForChild("BridgeNet"):WaitForChild("dataRemoteEvent")
-local globalPauseMode = false
 
 -- ─── PotionSystem ─────────────────────────────────────────────────────────────
 
-local globalPauseMode = false  -- ← declarar arriba del todo
-local globalPotsEnabled = false  -- ← master toggle
+local globalPauseMode = false
+local globalPotsEnabled = false  -- master toggle
 
 local PotionSystemClass = {}
 PotionSystemClass.__index = PotionSystemClass
