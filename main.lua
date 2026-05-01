@@ -1,9 +1,20 @@
--- ─── Anti AFK ─────────────────────────────────────────────────────────────────
 local VirtualUser = game:GetService("VirtualUser")
+local UserInputService = game:GetService("UserInputService")
+
 game:GetService("Players").LocalPlayer.Idled:Connect(function()
-    VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
-    task.wait(1)
-    VirtualUser:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+    if UserInputService.TouchEnabled then
+      
+        VirtualUser:ClickButton1(Vector2.new(
+            workspace.CurrentCamera.ViewportSize.X / 2, 
+            workspace.CurrentCamera.ViewportSize.Y / 2
+        ), workspace.CurrentCamera.CFrame)
+        
+    else
+        
+        VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+        task.wait(1)
+        VirtualUser:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+    end
 end)
 
 local function safeLoad(url, name)
