@@ -37,15 +37,15 @@ function UI:Init(WindUI, Functions, GameMode)
         HideSearchBar   = true,
         --Background      = "rbxassetid://82853802996092",
         ScrollBarEnable = true,
-		    KeySystem = {
-        Note = "Enter your key",
-        API = {
-            {
-                Type      = "pandadevelopment",
-                ServiceId = "g4bhub", -- tu identifier de Panda
-            },
-        },
-    },
+		--    KeySystem = {
+      --  Note = "Enter your key",
+     --   API = {
+       --     {
+        --        Type      = "pandadevelopment",
+         --       ServiceId = "g4bhub", -- tu identifier de Panda
+        --    },
+       -- },
+  --  },
 })
 	
 	Window:Tag({
