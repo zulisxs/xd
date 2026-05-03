@@ -1494,6 +1494,19 @@ local function ejecutarCicloBoss(shouldContinueFn)
 end
 
 -- ─── Toggle principal ─────────────────────────────────────────────────────
+local BossSection = Main:Section({ Title = "Global Bosses" })
+Main:Divider()
+
+local GlobalBossDropdown = Main:Dropdown({
+    Title     = "Boss",
+    Desc      = "Select boss",
+    Values    = ListBoss,
+    Multi     = true,
+    AllowNone = true,
+    Callback  = function(option)
+        BossesElegidos = option or {}
+    end
+})	
 local FarmBoss = Main:Toggle({
     Title    = "Auto Farm Global Bosses",
     Icon     = "skull",
