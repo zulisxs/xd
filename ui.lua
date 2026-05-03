@@ -1823,40 +1823,26 @@ Main:Toggle({
 
             -- ─── Check function ───────────────────────────────────────────
             local function getAvailableOres()
-                local available = {}
+    local available = {}
 
-                -- Primero leer carpeta sin escanear
-                for _, child in ipairs(oresFolder:GetChildren()) do
-                    for _, oreName in ipairs(oreNames) do
-                        if child.Name == oreName and child:IsA("BasePart") then
-                            table.insert(available, child)
-                        end
-                    end
-                end
+    -- Debug: ver qué hay en la carpeta
+    print("[ORES] Contenido de oresFolder:")
+    for _, child in ipairs(oresFolder:GetChildren()) do
+        print("  - " .. child.Name .. " (" .. child.ClassName .. ")")
+    end
 
-                -- Si no encontró nada → escanear CFrames y volver a leer
-                if #available == 0 then
-                    local scannedZones = {}
-                    for _, oreName in ipairs(oreNames) do
-                        local info = OresInfo[oreName]
-                        if info then
-                            local zoneKey = info.MapName .. "_" .. tostring(info.ZoneIndex)
-                            if not scannedZones[zoneKey] then
-                                scannedZones[zoneKey] = true
-                                print("[ORES] Escaneando: " .. zoneKey)
-                                getOreScanPos(info.MapName, info.ZoneIndex)
-                                task.wait(1.5)
-                                for _, child in ipairs(oresFolder:GetChildren()) do
-                                    if child.Name == oreName and child:IsA("BasePart") then
-                                        table.insert(available, child)
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
+    print("[ORES] Buscando: " .. table.concat(oreNames, ", "))
 
-                print("[ORES] getAvailableOres: " .. #available .. " encontrados")
+    -- Primero leer carpeta sin escanear
+    for _, child in ipairs(oresFolder:GetChildren()) do
+        for _, oreName in ipairs(oreNames) do
+            if child.Name == oreName and child:IsA("BasePart") then
+                table.insert(available, child)
+            end
+        end
+    end
+
+    print("[ORES] Sin escaneo: " .. #available .. " encontrados")
                 return available
             end
             -- ─── Farm callback ────────────────────────────────────────────
