@@ -1799,6 +1799,105 @@ Main:Dropdown({
     end,
 })
 
+-- ─── Escaneo inicial (una sola vez al activar) ────────────────────────────
+local function escaneoInicial(oreNames, callback)
+    local scannedZones = {}
+    for _, oreName in ipairs(oreNames) do
+        local info = OresInfo[oreName]
+        if info then
+            local zoneKey = info.MapName .. "_" .. tostring(info.ZoneIndex)
+            if not scannedZones[zoneKey] then
+                scannedZones[zoneKey] = true
+                print("[ORES] Escaneando: " .. zoneKey)
+                getOreScanPos(info.MapName, info.ZoneIndex)
+                task.wait(1.5)
+            end
+        end
+    end
+    print("[ORES] Escaneo inicial completo")
+    callback()
+end
+
+-- ─── Check function ───────────────────────────────────────────────────────
+local function getAvailableOres(oreNames)
+    local available = {}
+    for _, child in ipairs(oresFolder:GetChildren()) do
+        for _, oreName in ipairs(oreNames) do
+            if child.Name == oreName and child:IsA("BasePart") then
+                table.insert(available, child)
+            end
+        end
+    end
+    print("[ORES] getAvailableOres: " .. #available .. " encontrados")
+    return available
+end
+
+-- ─── Farm callback ────────────────────────────────────────────────────────
+local function farmOres(oreNames, shouldContinueFn)
+    local ores = getAvailableOres(oreNames)
+    if #ores == 0 then return end
+
+    print("[ORES] Farm cycle: " .. #ores .. " ores")
+
+    local returnMap    = Omni.Data.Map
+    local returnZone   = Omni.Data.Zone
+    local char         = LocalPlayer.Character
+    local returnCFrame = char and char:FindFirstChild("HumanoidRootPart") and char.HumanoidRootPart.CFrame
+
+    for _, ore in ipairs(ores) do
+        if not shouldContinueFn() then
+            print("[ORES] Interrupted")
+            break
+        end
+        if not ore.Parent then continue end
+
+        local oreName = ore.Name
+        local info    = OresInfo[oreName]
+
+        if info and (Omni.Data.Map ~= info.MapName or tostring(Omni.Data.Zone) ~= tostring(info.ZoneIndex)) then
+            print("[ORES] TP to map: " .. info.MapName .. " zone " .. tostring(info.ZoneIndex))
+            fireTeleport(info.MapName, info.ZoneIndex)
+            task.wait(3)
+        end
+        if not shouldContinueFn() then break end
+
+        task.wait(1)
+        Functions:SetFloating(true)
+        local hrp = workspace:FindFirstChild(LocalPlayer.Name)
+            and workspace[LocalPlayer.Name]:FindFirstChild("HumanoidRootPart")
+        if hrp and ore.Parent then
+            print("[ORES] Moving to " .. oreName)
+            hrp.CFrame = ore.CFrame + Vector3.new(0, 5, 0)
+        end
+        task.wait(0.5)
+
+        print("[ORES] " .. oreName .. " → waiting for death...")
+        while shouldContinueFn() and ore.Parent ~= nil do
+            task.wait(0.5)
+        end
+        if ore.Parent == nil then
+            print("[ORES] " .. oreName .. " killed!")
+        end
+
+        Functions:SetFloating(false)
+    end
+
+    print("[ORES] Returning to " .. tostring(returnMap) .. " zone " .. tostring(returnZone))
+    if returnMap then
+        fireTeleport(returnMap, returnZone)
+        task.wait(3)
+    end
+    if returnCFrame then
+        local c = LocalPlayer.Character
+        if c and c:FindFirstChild("HumanoidRootPart") then
+            c.HumanoidRootPart.CFrame = returnCFrame
+        end
+    end
+    task.wait(1.5)
+    print("[ORES] Farm cycle complete")
+end
+
+-- ─── Toggle ───────────────────────────────────────────────────────────────
 Main:Toggle({
     Title    = "Auto Farm Ores",
     Icon     = "pickaxe",
@@ -1819,98 +1918,23 @@ Main:Toggle({
                 print("[ORES] No ores selected")
                 return
             end
-            print("[ORES] Toggle ON - Ores: " .. table.concat(oreNames, ", "))
 
-            -- ─── Check function ───────────────────────────────────────────
-            local function getAvailableOres()
-    local available = {}
+            print("[ORES] Activando para: " .. table.concat(oreNames, ", "))
 
-    -- Debug: ver qué hay en la carpeta
-    print("[ORES] Contenido de oresFolder:")
-    for _, child in ipairs(oresFolder:GetChildren()) do
-        print("  - " .. child.Name .. " (" .. child.ClassName .. ")")
-    end
-
-    print("[ORES] Buscando: " .. table.concat(oreNames, ", "))
-
-    -- Primero leer carpeta sin escanear
-    for _, child in ipairs(oresFolder:GetChildren()) do
-        for _, oreName in ipairs(oreNames) do
-            if child.Name == oreName and child:IsA("BasePart") then
-                table.insert(available, child)
-            end
-        end
-    end
-
-    print("[ORES] Sin escaneo: " .. #available .. " encontrados")
-                return available
-            end
-            -- ─── Farm callback ────────────────────────────────────────────
-            local function farmOres(shouldContinueFn)
-                local ores = getAvailableOres()
-                if #ores == 0 then return end
-
-                print("[ORES] Farm cycle: " .. #ores .. " ores")
-
-                local returnMap    = Omni.Data.Map
-                local returnZone   = Omni.Data.Zone
-                local char         = LocalPlayer.Character
-                local returnCFrame = char and char:FindFirstChild("HumanoidRootPart") and char.HumanoidRootPart.CFrame
-
-                for _, ore in ipairs(ores) do
-                    if not shouldContinueFn() then
-                        print("[ORES] Interrupted")
-                        break
-                    end
-                    if not ore.Parent then continue end
-
-                    local oreName = ore.Name
-                    local info    = OresInfo[oreName]
-
-                    if info and (Omni.Data.Map ~= info.MapName or tostring(Omni.Data.Zone) ~= tostring(info.ZoneIndex)) then
-                        print("[ORES] TP to map: " .. info.MapName .. " zone " .. tostring(info.ZoneIndex))
-                        fireTeleport(info.MapName, info.ZoneIndex)
-                        task.wait(3)
-                    end
-                    if not shouldContinueFn() then break end
-
-                    task.wait(1)
-                    Functions:SetFloating(true)
-                    local hrp = workspace:FindFirstChild(LocalPlayer.Name)
-                        and workspace[LocalPlayer.Name]:FindFirstChild("HumanoidRootPart")
-                    if hrp and ore.Parent then
-                        print("[ORES] Moving to " .. oreName)
-                        hrp.CFrame = ore.CFrame + Vector3.new(0, 5, 0)
-                    end
-                    task.wait(0.5)
-
-                    print("[ORES] " .. oreName .. " → waiting for death...")
-                    while shouldContinueFn() and ore.Parent ~= nil do
-                        task.wait(0.5)
-                    end
-                    if ore.Parent == nil then
-                        print("[ORES] " .. oreName .. " killed!")
-                    end
-
-                    Functions:SetFloating(false)
-                end
-
-                print("[ORES] Returning to " .. tostring(returnMap) .. " zone " .. tostring(returnZone))
-                if returnMap then
-                    fireTeleport(returnMap, returnZone)
-                    task.wait(3)
-                end
-                if returnCFrame then
-                    local c = LocalPlayer.Character
-                    if c and c:FindFirstChild("HumanoidRootPart") then
-                        c.HumanoidRootPart.CFrame = returnCFrame
-                    end
-                end
-                task.wait(1.5)
-                print("[ORES] Farm cycle complete")
-            end
-
-            GameMode:StartOres(getAvailableOres, farmOres)
+            task.spawn(function()
+                -- 1. Escanear primero, bloquea hasta terminar
+                escaneoInicial(oreNames, function()
+                    -- 2. Recién ahora registrar en scheduler
+                    GameMode:StartOres(
+                        function()
+                            return getAvailableOres(oreNames)
+                        end,
+                        function(shouldContinueFn)
+                            farmOres(oreNames, shouldContinueFn)
+                        end
+                    )
+                end)
+            end)
         else
             GameMode:StopOres()
         end
