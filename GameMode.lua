@@ -19,8 +19,13 @@ local potionSystems   = nil  -- {trial, tempest, dragon, globalBosses}
 
 -- Boss Global
 local bossGlobalEnabled = false
-local bossAliveCheckFn  = nil  -- fn() → {"Yuje", "Sakana"} o {}
-local bossFarmCallback  = nil  -- fn(shouldContinueFn) → ejecuta ciclo de farm
+local bossAliveCheckFn  = nil
+local bossFarmCallback  = nil
+
+-- Ores
+local oresEnabled     = false
+local oresCheckFn     = nil  -- fn() → list of ore BaseParts or {}
+local oresFarmCallback = nil -- fn(shouldContinueFn)
 
 -- Toggle states (cada toggle es independiente)
 local trialEnabled   = false
@@ -175,6 +180,13 @@ end
 
 local function resumeAutoFarm()
     if functionsRef and autoFarmPaused then
+        if oresEnabled and oresCheckFn then
+            local ores = oresCheckFn()
+            if ores and #ores > 0 then
+                print("[RESUME] AutoFarm skip: ores available")
+                return
+            end
+        end
         if bossGlobalEnabled and bossAliveCheckFn then
             local alive = bossAliveCheckFn()
             if alive and #alive > 0 then
@@ -308,7 +320,15 @@ local function getHighestPriorityActivity()
         end
     end
 
-    -- Prioridad 2: Boss Global
+    -- Prioridad 2: Ores
+    if oresEnabled and oresCheckFn then
+        local ores = oresCheckFn()
+        if ores and #ores > 0 then
+            return "Ores"
+        end
+    end
+
+    -- Prioridad 3: Boss Global
     if bossGlobalEnabled and bossAliveCheckFn then
         local alive = bossAliveCheckFn()
         if alive and #alive > 0 then
@@ -316,14 +336,14 @@ local function getHighestPriorityActivity()
         end
     end
 
-    -- Prioridad 3: Tempest (bloquea Dragon si está activo)
+    -- Prioridad 4: Tempest (bloquea Dragon si está activo)
     if tempestEnabled then
         if now >= (reentryTimers["Tempest Invasion"] or 0) then
             return "Tempest Invasion"
         end
     end
 
-    -- Prioridad 4: Dragon (solo si Tempest NO está activo)
+    -- Prioridad 5: Dragon (solo si Tempest NO está activo)
     if dragonEnabled and not tempestEnabled then
         if now >= (reentryTimers["Dragon Defense"] or 0) then
             return "Dragon Defense"
@@ -459,7 +479,7 @@ end
 -- ─── Scheduler ────────────────────────────────────────────────────────────────
 
 local function anyToggleOn()
-    return trialEnabled or tempestEnabled or dragonEnabled or bossGlobalEnabled
+    return trialEnabled or tempestEnabled or dragonEnabled or bossGlobalEnabled or oresEnabled
 end
 
 local function ensureSchedulerRunning()
@@ -478,11 +498,22 @@ local function ensureSchedulerRunning()
                     resumeAutoFarm()
                 end
                 task.wait(2)
-            elseif activity == "BossGlobal" then
-                -- Boss Global: pausar autofarm, ejecutar ciclo, resumir
-                print("[SCHEDULER] Boss Global alive → ejecutando farm")
+            elseif activity == "Ores" then
+                print("[SCHEDULER] Ores available → farming")
                 pauseAutoFarm()
-                -- Pociones al entrar
+                local oresPots = potionSystems and potionSystems.ores
+                if oresPots then oresPots:OnStart() end
+                if oresFarmCallback then
+                    oresFarmCallback(function()
+                        return oresEnabled and not hasHigherPriorityTrial()
+                    end)
+                end
+                if oresPots then oresPots:OnFinish() end
+                resumeAutoFarm()
+                task.wait(1.5)
+            elseif activity == "BossGlobal" then
+                print("[SCHEDULER] Boss Global alive → farming")
+                pauseAutoFarm()
                 local bossPots = potionSystems and potionSystems.globalBosses
                 if bossPots then bossPots:OnStart() end
                 if bossFarmCallback then
@@ -490,7 +521,6 @@ local function ensureSchedulerRunning()
                         return bossGlobalEnabled and not hasHigherPriorityTrial()
                     end)
                 end
-                -- Pociones al salir
                 if bossPots then bossPots:OnFinish() end
                 resumeAutoFarm()
                 task.wait(1.5)
@@ -621,6 +651,21 @@ function GameMode:StopBossGlobal()
     bossAliveCheckFn = nil
     bossFarmCallback = nil
     print("[SCHEDULER] BossGlobal stopped")
+end
+
+function GameMode:StartOres(checkFn, farmCallback)
+    oresCheckFn     = checkFn
+    oresFarmCallback = farmCallback
+    oresEnabled     = true
+    print("[SCHEDULER] Ores started")
+    ensureSchedulerRunning()
+end
+
+function GameMode:StopOres()
+    oresEnabled      = false
+    oresCheckFn      = nil
+    oresFarmCallback = nil
+    print("[SCHEDULER] Ores stopped")
 end
 
 return GameMode
