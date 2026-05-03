@@ -1299,19 +1299,25 @@ local BossCFrames = {
     ["Yuje"]   = CFrame.new(10873.502, 773.154114, -5159.50684, -1.1920929e-07, 0, 1.00000012, 0, 1, 0, -1.00000012, 0, -1.1920929e-07),
 }
 
--- ─── Función: forzar carga del template de un boss ────────────────────────
+-- ─── Cronómetros de cada boss ─────────────────────────────────────────────
+-- Guarda el momento exacto del servidor en que cada boss debería spawnear
+local bossSpawnTime = {}
+-- {
+--     ["Yuje"]   = 12345.6,  ← tiempo del servidor cuando spawneará
+--     ["Sakana"] = 12500.0,
+-- }
+
+-- ─── Función: forzar carga del template ───────────────────────────────────
 local function cargarTemplate(bossName)
     local cf = BossCFrames[bossName]
     if not cf then return end
-    -- Fuerza la carga del área usando RequestStreamAroundAsync
     game:GetService("Players").LocalPlayer:RequestStreamAroundAsync(cf.Position)
     task.wait(1.2)
 end
 
--- ─── Función: obtener timer de un boss desde templates ────────────────────
+-- ─── Función: obtener timer desde templates ───────────────────────────────
 local function getBossTimer(bossName)
     local bossFolder = templates:FindFirstChild(bossName)
-    -- Si no está cargado, forzar carga y reintentar
     if not bossFolder then
         print("[BOSS] Template de " .. bossName .. " no encontrado, forzando carga...")
         cargarTemplate(bossName)
@@ -1327,11 +1333,47 @@ local function getBossTimer(bossName)
     return timeLabel.Text
 end
 
--- ─── Función: verificar si un boss está vivo ──────────────────────────────
-local function isBossAlive(bossName)
+-- ─── Función: registrar el cronómetro de un boss ──────────────────────────
+local function registrarCronometro(bossName, timerTexto)
+    local segundos = textoASegundos(timerTexto)
+    if segundos > 0 then
+        -- Momento exacto del servidor en que spawneará
+        local spawnEn = workspace:GetServerTimeNow() + segundos
+        bossSpawnTime[bossName] = spawnEn
+        print("[BOSS] " .. bossName .. " cronómetro registrado → spawn en " .. segundos .. "s (server time: " .. string.format("%.1f", spawnEn) .. ")")
+    else
+        -- Ya está vivo, no necesita cronómetro
+        bossSpawnTime[bossName] = nil
+        print("[BOSS] " .. bossName .. " ya está vivo, sin cronómetro")
+    end
+end
+
+-- ─── Función: cuántos segundos faltan para que spawne ─────────────────────
+local function segundosParaSpawn(bossName)
+    local spawnEn = bossSpawnTime[bossName]
+    if not spawnEn then return 0 end  -- sin cronómetro = está vivo
+    local restantes = spawnEn - workspace:GetServerTimeNow()
+    return math.max(0, restantes)
+end
+
+-- ─── Función: verificar si un boss está listo para farmearlo ──────────────
+local function isBossListo(bossName)
+    -- Primero revisar el cronómetro local
+    local restantes = segundosParaSpawn(bossName)
+    if restantes > 0 then
+        return false  -- todavía no es hora
+    end
+    -- El cronómetro dice que ya spawneó → verificar en templates
     local timer = getBossTimer(bossName)
     if not timer then return false end
-    return textoASegundos(timer) == 0
+    local segundos = textoASegundos(timer)
+    if segundos > 0 then
+        -- Sigue muerto, actualizar cronómetro con el tiempo real
+        print("[BOSS] " .. bossName .. " sigue muerto, actualizando cronómetro...")
+        registrarCronometro(bossName, timer)
+        return false
+    end
+    return true  -- timer == 0s → está vivo
 end
 
 -- ─── UI ───────────────────────────────────────────────────────────────────
@@ -1381,21 +1423,27 @@ local FarmBoss = Main:Toggle({
 
             print("[BOSS] Toggle ON - Bosses: " .. table.concat(bossNames, ", "))
 
-            -- ═══ PASO INICIAL: forzar carga de templates ═══
+            -- ═══ PASO INICIAL: leer timers y registrar cronómetros ═══
             for _, bossName in ipairs(bossNames) do
                 if not bossAutoFarmActive then break end
                 local timer = getBossTimer(bossName)
                 if timer then
-                    print("[BOSS] " .. bossName .. " timer: '" .. timer .. "'")
+                    print("[BOSS] " .. bossName .. " timer inicial: '" .. timer .. "'")
+                    registrarCronometro(bossName, timer)
                 end
             end
 
-            -- ═══ FUNCIÓN: obtener bosses vivos ═══
+            -- ═══ FUNCIÓN: obtener bosses listos para farmear ═══
             local function getAliveBosses()
                 local alive = {}
                 for _, bossName in ipairs(bossNames) do
-                    if isBossAlive(bossName) then
+                    if isBossListo(bossName) then
                         table.insert(alive, bossName)
+                    else
+                        local restantes = segundosParaSpawn(bossName)
+                        if restantes > 0 then
+                            print("[BOSS] " .. bossName .. " spawn en " .. string.format("%.0f", restantes) .. "s")
+                        end
                     end
                 end
                 return alive
@@ -1409,9 +1457,9 @@ local FarmBoss = Main:Toggle({
                 print("[BOSS] Farm cycle: " .. table.concat(aliveBosses, ", "))
 
                 -- Guardar retorno
-                local returnMap   = Omni.Data.Map
-                local returnZone  = Omni.Data.Zone
-                local char        = LocalPlayer.Character
+                local returnMap    = Omni.Data.Map
+                local returnZone   = Omni.Data.Zone
+                local char         = LocalPlayer.Character
                 local returnCFrame = char and char:FindFirstChild("HumanoidRootPart") and char.HumanoidRootPart.CFrame
 
                 for _, bossName in ipairs(aliveBosses) do
@@ -1420,7 +1468,7 @@ local FarmBoss = Main:Toggle({
                         break
                     end
 
-                    -- Viajar al mapa del boss
+                    -- Viajar al mapa
                     local info = InfoBoss[bossName]
                     if info and (Omni.Data.Map ~= info.MapName or tostring(Omni.Data.Zone) ~= tostring(info.ZoneIndex)) then
                         print("[BOSS] TP al mapa: " .. info.MapName)
@@ -1443,10 +1491,10 @@ local FarmBoss = Main:Toggle({
                     end
                     task.wait(1)
 
-                    -- Verificar timer directamente desde templates
+                    -- Verificar una vez más con templates
                     local timerText = getBossTimer(bossName)
                     local remaining = timerText and textoASegundos(timerText) or -1
-                    print("[BOSS] " .. bossName .. " check: '" .. tostring(timerText) .. "' (" .. remaining .. "s)")
+                    print("[BOSS] " .. bossName .. " check final: '" .. tostring(timerText) .. "' (" .. remaining .. "s)")
 
                     -- Si faltan pocos segundos esperar
                     if remaining > 0 and remaining <= 10 then
@@ -1454,7 +1502,6 @@ local FarmBoss = Main:Toggle({
                         task.wait(remaining + 1)
                         timerText = getBossTimer(bossName)
                         remaining = timerText and textoASegundos(timerText) or -1
-                        print("[BOSS] " .. bossName .. " re-check: '" .. tostring(timerText) .. "'")
                     end
 
                     local isAlive = remaining == 0
@@ -1466,12 +1513,17 @@ local FarmBoss = Main:Toggle({
                             local t = getBossTimer(bossName)
                             if t and textoASegundos(t) > 0 then
                                 print("[BOSS] " .. bossName .. " killed! Nuevo timer: '" .. t .. "'")
+                                -- Registrar nuevo cronómetro con el timer real
+                                registrarCronometro(bossName, t)
                                 break
                             end
                             task.wait(0.5)
                         end
                     else
                         print("[BOSS] " .. bossName .. " ya muerto, skip")
+                        if timerText then
+                            registrarCronometro(bossName, timerText)
+                        end
                     end
 
                     Functions:SetFloating(false)
@@ -1498,6 +1550,7 @@ local FarmBoss = Main:Toggle({
             GameMode:StartBossGlobal(getAliveBosses, ejecutarCicloBoss)
         else
             GameMode:StopBossGlobal()
+            bossSpawnTime = {}  -- limpiar cronómetros al desactivar
         end
     end
 })
