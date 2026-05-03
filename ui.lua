@@ -1825,7 +1825,7 @@ Main:Toggle({
             local function getAvailableOres()
                 local available  = {}
                 local scannedZones = {}
-
+            
                 for _, oreName in ipairs(oreNames) do
                     local info = OresInfo[oreName]
                     if info then
@@ -1833,11 +1833,16 @@ Main:Toggle({
                         local onMap   = Omni.Data.Map == info.MapName
                             and tostring(Omni.Data.Zone) == tostring(info.ZoneIndex)
 
+                        print("[ORES] Check: " .. oreName .. " | onMap: " .. tostring(onMap))
+
                         if not onMap and not scannedZones[zoneKey] then
                             scannedZones[zoneKey] = true
+                            print("[ORES] Escaneando zona: " .. zoneKey)
                             getOreScanPos(info.MapName, info.ZoneIndex)
                             task.wait(0.5)
                         end
+                    else
+                        print("[ORES] Sin info para: " .. oreName)
                     end
                 end
 
@@ -1849,9 +1854,9 @@ Main:Toggle({
                     end
                 end
 
+                print("[ORES] getAvailableOres devuelve: " .. #available .. " ores")
                 return available
             end
-
             -- ─── Farm callback ────────────────────────────────────────────
             local function farmOres(shouldContinueFn)
                 local ores = getAvailableOres()
