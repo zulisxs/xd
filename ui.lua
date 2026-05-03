@@ -603,6 +603,7 @@ local UnitDropdown = AutoRename:Dropdown({
     Multi    = true,
 	SearchBarEnabled = true,		
     Values   = labels,
+	AllowNone = true,
     Callback = function(selected)
         -- selected es una tabla con los labels seleccionados
         -- pero Multi no garantiza orden, así que lo manejamos manualmente
@@ -987,6 +988,7 @@ local AriseDropdown = AutoRename:Dropdown({
     Multi    = true,
     Values   = ariseLabels,
 	SearchBarEnabled = true,
+    AllowNone = true,
     Callback = function(selected)
         ariseState.unitQueue = {}
         for _, label in ipairs(selected) do
