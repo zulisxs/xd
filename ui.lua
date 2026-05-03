@@ -601,6 +601,7 @@ local UnitDropdown = AutoRename:Dropdown({
     Desc     = "Select units in order to rename",
     Icon     = "layers",
     Multi    = true,
+	SearchBarEnabled = true,		
     Values   = labels,
     Callback = function(selected)
         -- selected es una tabla con los labels seleccionados
@@ -985,6 +986,7 @@ local AriseDropdown = AutoRename:Dropdown({
     Icon     = "layers",
     Multi    = true,
     Values   = ariseLabels,
+	SearchBarEnabled = true,
     Callback = function(selected)
         ariseState.unitQueue = {}
         for _, label in ipairs(selected) do
