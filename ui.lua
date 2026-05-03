@@ -1732,14 +1732,16 @@ local ListOres = {}
 local OresInfo = {} -- {oreName = {MapName, ZoneIndex}}
 local SelectedOres = {}
 
-for oreName, info in pairs(OresData) do
-    if not table.find(ListOres, oreName) then
-        table.insert(ListOres, oreName)
+for oreName, info in pairs(OresData.List or OresData) do
+    if type(info) == "table" and info.MapName then
+        if not table.find(ListOres, oreName) then
+            table.insert(ListOres, oreName)
+        end
+        OresInfo[oreName] = {
+            MapName   = info.MapName,
+            ZoneIndex = info.ZoneIndex,
+        }
     end
-    OresInfo[oreName] = {
-        MapName   = info.MapName,
-        ZoneIndex = info.ZoneIndex,
-    }
 end
 table.sort(ListOres)
 
