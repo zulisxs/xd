@@ -203,7 +203,7 @@ Main:Toggle({
     -- ─── Tab Info ─────────────────────────────────────────────────────────────
     Info:Paragraph({
         Title = "G4B HUB Update log",
-        Desc  = "Hey guys, if there are any errors with the script, let me know on Discord.\nV1.1: \n- Add fast atack speed \n- Fix Auto farm \n -Fix auto Farm game modes \nV1.0: \n - Release Script" ,
+        Desc  = "Hey guys, if there are any errors with the script, let me know on Discord.\nV1.2:\n- Add Auto Global Boss \n- Add Auto Arise\nV1.1: \n- Add fast atack speed \n- Fix Auto farm \n -Fix auto Farm game modes \nV1.0: \n - Release Script" ,
         Color = "Grey",
         Thumbnail = "rbxassetid://76454598364905",
         ThumbnailSize = 200,
@@ -425,6 +425,7 @@ GameModeTab:Toggle({
     local Section = AutoRename:Section({ 
     Title = "Auto Rename",
     TextXAlignment = "Center",
+	Opened = true,
 })
 
 AutoRename:Divider()
@@ -908,7 +909,272 @@ AutoRename:Toggle({
         allTargetStop = active
     end
 })
+ 
+-------------------------------------Auto Arise------------------------------------
 
+local AriseSection = AutoRename:Section({ 
+    Title = "Auto Arise",
+    TextXAlignment = "Center",
+})
+AutoRename:Divider()
+
+-- ─── Conversión letra → número ────────────────────────────────────────────
+local rankToNumber = {
+    ["E"] = 1,
+    ["D"] = 2,
+    ["C"] = 3,
+    ["B"] = 4,
+    ["A"] = 5,
+    ["S"] = 6,
+}
+
+-- ─── Estado ───────────────────────────────────────────────────────────────
+local ariseState = {
+    unitQueue   = {},
+    unitIndex   = 1,
+    unitId      = "",
+    targetRank  = nil,
+    running     = false,
+}
+local ariseSoloEquipadas = false
+
+-- ─── Helpers ──────────────────────────────────────────────────────────────
+local function getAriseTokens()
+    local pd = getPlayerData()
+    if not pd or not pd.Data then return 0 end
+    local tokens = pd.Data.Inventory.Items["Arise Token"]
+    if not tokens then return 0 end
+    return math.floor(tokens)
+end
+
+local function getUnitRank(unitId)
+    local pd = getPlayerData()
+    if not pd or not pd.Data then return nil end
+    local unit = pd.Data.Inventory.Units[unitId]
+    if not unit then return nil end
+    return unit.Rank or 0
+end
+
+local function getTokensNeeded(currentRank)
+    local ranksPrices = {10, 20, 35, 50, 75, 150}
+    return ranksPrices[currentRank] or 10
+end
+
+local function sendArise(unitId)
+    local args = {
+        {
+            {
+                "General",
+                "Units",
+                "Arise",
+                unitId,
+                n = 4
+            },
+            "\002"
+        }
+    }
+    game:GetService("ReplicatedStorage"):WaitForChild("BridgeNet"):WaitForChild("dataRemoteEvent"):FireServer(unpack(args))
+end
+
+-- ─── UI ───────────────────────────────────────────────────────────────────
+local ariseLabels, ariseLabelToId = getUnitList(false)
+
+local AriseDropdown = AutoRename:Dropdown({
+    Title    = "Select Unit",
+    Desc     = "Select units to arise",
+    Icon     = "layers",
+    Multi    = true,
+    Values   = ariseLabels,
+    Callback = function(selected)
+        ariseState.unitQueue = {}
+        for _, label in ipairs(selected) do
+            local id = ariseLabelToId[label]
+            if id then
+                table.insert(ariseState.unitQueue, id)
+            end
+        end
+        -- Mostrar rank actual de la primera unidad
+        if #ariseState.unitQueue > 0 then
+            local firstId = ariseState.unitQueue[1]
+            local rank = getUnitRank(firstId)
+            local rankNames = {"E", "D", "C", "B", "A", "S"}
+            WindUI:Notify({
+                Title   = "Unit selected",
+                Content = "Current Rank: " .. (rankNames[rank] or "None"),
+                Icon    = "layers",
+                Duration = 3,
+            })
+        end
+    end
+})
+
+AutoRename:Button({
+    Title    = "Refresh Units",
+    Desc     = "First open inventory",
+    Icon     = "refresh-cw",
+    Callback = function()
+        ariseLabels, ariseLabelToId = getUnitList(ariseSoloEquipadas)
+        AriseDropdown:Refresh(ariseLabels)
+    end
+})
+
+AutoRename:Toggle({
+    Title    = "Only units equipped",
+    Icon     = "shield",
+    Type     = "Checkbox",
+    Value    = false,
+    Callback = function(active)
+        ariseSoloEquipadas = active
+        ariseLabels, ariseLabelToId = getUnitList(ariseSoloEquipadas)
+        AriseDropdown:Refresh(ariseLabels)
+    end
+})
+
+AutoRename:Divider()
+
+local AriseTargetDropdown = AutoRename:Dropdown({
+    Title    = "Target Rank",
+    Desc     = "Select the rank you want to reach",
+    Icon     = "target",
+    Multi    = false,
+    Values   = {"E", "D", "C", "B", "A", "S"},
+    Callback = function(selected)
+        ariseState.targetRank = rankToNumber[selected]
+        WindUI:Notify({
+            Title    = "Target set",
+            Content  = "Target Rank: " .. selected,
+            Icon     = "target",
+            Duration = 3,
+        })
+    end
+})
+
+AutoRename:Divider()
+
+-- ─── Loop principal ───────────────────────────────────────────────────────
+local function runAriseLoop()
+    if #ariseState.unitQueue == 0 then
+        WindUI:Notify({
+            Title    = "Error",
+            Content  = "Select at least one unit.",
+            Icon     = "alert-circle",
+            Duration = 4,
+        })
+        ariseState.running = false
+        return
+    end
+
+    if not ariseState.targetRank then
+        WindUI:Notify({
+            Title    = "Error",
+            Content  = "Select a target rank.",
+            Icon     = "alert-circle",
+            Duration = 4,
+        })
+        ariseState.running = false
+        return
+    end
+
+    ariseState.unitIndex = 1
+
+    while ariseState.running and ariseState.unitIndex <= #ariseState.unitQueue do
+        ariseState.unitId = ariseState.unitQueue[ariseState.unitIndex]
+
+        local pd = getPlayerData()
+        local unitData = pd and pd.Data and pd.Data.Inventory.Units[ariseState.unitId]
+        local unitLabel = unitData and (unitData.Name .. " #" .. tostring(unitData.SerialNumber)) or ariseState.unitId
+        local rankNames = {"E", "D", "C", "B", "A", "S"}
+
+        WindUI:Notify({
+            Title   = "Processing unit " .. ariseState.unitIndex .. "/" .. #ariseState.unitQueue,
+            Content = unitLabel,
+            Icon    = "layers",
+            Duration = 4,
+        })
+
+        -- Loop de arise para la unidad actual
+        while ariseState.running do
+            local currentRank = getUnitRank(ariseState.unitId)
+
+            -- ¿Ya alcanzó el target?
+            if currentRank >= ariseState.targetRank then
+                WindUI:Notify({
+                    Title   = "Target reached! " .. ariseState.unitIndex .. "/" .. #ariseState.unitQueue,
+                    Content = unitLabel .. " → Rank " .. (rankNames[currentRank] or "?"),
+                    Icon    = "check-circle",
+                    Duration = 8,
+                })
+                ariseState.unitIndex = ariseState.unitIndex + 1
+                break
+            end
+
+            -- Verificar tokens
+            local tokensNeeded = getTokensNeeded(currentRank)
+            local tokensAvailable = getAriseTokens()
+
+            if tokensAvailable < tokensNeeded then
+                WindUI:Notify({
+                    Title   = "Waiting for tokens",
+                    Content = "Arise Tokens: " .. tokensAvailable .. "/" .. tokensNeeded,
+                    Icon    = "clock",
+                    Duration = 5,
+                })
+                while ariseState.running and getAriseTokens() < tokensNeeded do
+                    task.wait(5)
+                end
+                if not ariseState.running then break end
+                WindUI:Notify({
+                    Title   = "Tokens available!",
+                    Content = "Arise Tokens: " .. getAriseTokens(),
+                    Icon    = "check-circle",
+                    Duration = 4,
+                })
+            end
+
+            -- Enviar arise
+            sendArise(ariseState.unitId)
+            task.wait(1.2)
+
+            -- Notificar rank actual
+            local newRank = getUnitRank(ariseState.unitId)
+            WindUI:Notify({
+                Title   = "Arise → " .. unitLabel,
+                Content = "Rank: " .. (rankNames[newRank] or "?"),
+                Icon    = "refresh-cw",
+                Duration = 3,
+            })
+        end
+    end
+
+    -- Terminó todas las unidades
+    if ariseState.unitIndex > #ariseState.unitQueue then
+        WindUI:Notify({
+            Title   = "All units done!",
+            Content = "All " .. #ariseState.unitQueue .. " units have been arised.",
+            Icon    = "check-circle",
+            Duration = 8,
+        })
+    end
+
+    ariseState.running = false
+end
+
+-- ─── Toggle activar ───────────────────────────────────────────────────────
+AutoRename:Toggle({
+    Title    = "Activate",
+    Icon     = "check",
+    Type     = "Checkbox",
+    Value    = false,
+    Callback = function(active)
+        ariseState.running = active
+        if active then
+            task.spawn(runAriseLoop)
+        end
+    end
+})	
+	
+	
+--------------------------------Auto Sell-----------------------------------------------
 local SelectAccesories = Accesories:Dropdown({
     Title    = "Select accesories",
     Desc     = "Accessories of the selected rarity will be sold",
@@ -1505,7 +1771,6 @@ local UIBoss = Main:Toggle({
     local dragonPots  = Functions:NewPotionSystem()
     local bossesPots  = Functions:NewPotionSystem()
     local SectionGeneral = Loadouts:Section({ Title = "Loadouts",TextXAlignment ="Center" })
-    Loadouts:Select()
     Loadouts:Divider()
     Loadouts:Space() 
 
