@@ -1017,6 +1017,27 @@ AutoRename:Button({
     Callback = function()
         ariseLabels, ariseLabelToId = getUnitList(ariseSoloEquipadas)
         AriseDropdown:Refresh(ariseLabels)
+
+        -- Actualizar seriales en la UI del juego
+        local pd = getPlayerData()
+        if pd and pd.Data then
+            local unitFrames = game:GetService("Players").LocalPlayer.PlayerGui.UI.Frames.Units.Background.Main.Canvas.List
+            for unitId, unit in pairs(pd.Data.Inventory.Units) do
+                local frame = unitFrames:FindFirstChild(unitId)
+                if frame then
+                    local bg = frame:FindFirstChild("Background")
+                    if bg then
+                        local titleFrame = bg:FindFirstChild("Title")
+                        if titleFrame then
+                            local frontTitle = titleFrame:FindFirstChild("FrontTitle")
+                            if frontTitle then
+                                frontTitle.Text = "#" .. tostring(unit.SerialNumber)
+                            end
+                        end
+                    end
+                end
+            end
+        end
     end
 })
 
