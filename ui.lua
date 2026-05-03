@@ -1363,6 +1363,14 @@ local function getAliveBosses()
     end
     return alive
 end
+local BRIDGE_NET = game:GetService("ReplicatedStorage"):WaitForChild("BridgeNet"):WaitForChild("dataRemoteEvent")
+
+local function fireTeleport(worldName, zoneName)
+    BRIDGE_NET:FireServer({
+        { "Player", "Teleport", "Teleport", worldName, zoneName, n = 5 },
+        "\002",
+    })
+end	
 
 -- ─── Ciclo de farm ────────────────────────────────────────────────────────
 local function ejecutarCicloBoss(shouldContinueFn)
@@ -1447,15 +1455,6 @@ local GlobalBossDropdown = Main:Dropdown({
         BossesElegidos = option or {}
     end
 })
-
-local BRIDGE_NET = game:GetService("ReplicatedStorage"):WaitForChild("BridgeNet"):WaitForChild("dataRemoteEvent")
-
-local function fireTeleport(worldName, zoneName)
-    BRIDGE_NET:FireServer({
-        { "Player", "Teleport", "Teleport", worldName, zoneName, n = 5 },
-        "\002",
-    })
-end
 
 -- ─── Toggle principal ─────────────────────────────────────────────────────
 local FarmBoss = Main:Toggle({
