@@ -1724,6 +1724,171 @@ local FarmBoss = Main:Toggle({
         dragon  = dragonPots,
         globalBosses= bossesPots
     })
+
+-- ─── Auto Ores ────────────────────────────────────────────────────────────
+local OresData = require(game:GetService("ReplicatedStorage").Omni.Shared.Ores)
+local oresFolder = workspace:WaitForChild("Server"):WaitForChild("Enemies"):WaitForChild("Ores")
+local ListOres = {}
+local OresInfo = {} -- {oreName = {MapName, ZoneIndex}}
+local SelectedOres = {}
+
+for oreName, info in pairs(OresData) do
+    if not table.find(ListOres, oreName) then
+        table.insert(ListOres, oreName)
+    end
+    OresInfo[oreName] = {
+        MapName   = info.MapName,
+        ZoneIndex = info.ZoneIndex,
+    }
+end
+table.sort(ListOres)
+
+local OreSection = Main:Section({ 
+    Title = "Auto Ores",
+})
+Main:Divider()
+
+Main:Dropdown({
+    Title     = "Select Ores",
+    Values    = ListOres,
+    Multi     = true,
+    AllowNone = true,
+    Callback  = function(option)
+        SelectedOres = option or {}
+    end,
+})
+
+Main:Toggle({
+    Title    = "Auto Farm Ores",
+    Icon     = "pickaxe",
+    Type     = "Checkbox",
+    Value    = false,
+    Callback = function(state)
+        if state then
+            -- Build list of selected ore names
+            local oreNames = {}
+            for k, v in pairs(SelectedOres) do
+                if type(k) == "number" then
+                    table.insert(oreNames, v)
+                elseif type(k) == "string" and v then
+                    table.insert(oreNames, k)
+                end
+            end
+            if #oreNames == 0 then
+                print("[ORES] No ores selected")
+                return
+            end
+            print("[ORES] Toggle ON - Ores: " .. table.concat(oreNames, ", "))
+
+            -- Check function: returns list of alive ore BaseParts matching selected names
+            local function getAvailableOres()
+                local available = {}
+                -- Check if we need RequestStreamAroundAsync for any ore
+                for _, oreName in ipairs(oreNames) do
+                    local info = OresInfo[oreName]
+                    if info then
+                        local onMap = Omni.Data.Map == info.MapName and tostring(Omni.Data.Zone) == tostring(info.ZoneIndex)
+                        if not onMap then
+                            -- Load remote
+                            local cf = BossCFrames[oreName]
+                            if not cf then
+                                -- Use a default position for ore maps (request around zone)
+                                pcall(function()
+                                    LocalPlayer:RequestStreamAroundAsync(Vector3.new(0, 100, 0))
+                                end)
+                                task.wait(1)
+                            end
+                        end
+                    end
+                end
+                -- Read ores folder
+                for _, child in ipairs(oresFolder:GetChildren()) do
+                    for _, oreName in ipairs(oreNames) do
+                        if child.Name == oreName then
+                            table.insert(available, child)
+                        end
+                    end
+                end
+                return available
+            end
+
+            -- Farm callback
+            local function farmOres(shouldContinueFn)
+                local ores = getAvailableOres()
+                if #ores == 0 then return end
+
+                print("[ORES] Farm cycle: " .. #ores .. " ores")
+
+                local returnMap  = Omni.Data.Map
+                local returnZone = Omni.Data.Zone
+                local char = LocalPlayer.Character
+                local returnCFrame = char and char:FindFirstChild("HumanoidRootPart") and char.HumanoidRootPart.CFrame
+
+                for _, ore in ipairs(ores) do
+                    if not shouldContinueFn() then
+                        print("[ORES] Interrupted")
+                        break
+                    end
+                    if not ore.Parent then continue end -- already dead
+
+                    local oreName = ore.Name
+                    local info = OresInfo[oreName]
+
+                    -- TP to ore map if needed
+                    if info and (Omni.Data.Map ~= info.MapName or tostring(Omni.Data.Zone) ~= tostring(info.ZoneIndex)) then
+                        print("[ORES] TP to map: " .. info.MapName .. " zone " .. tostring(info.ZoneIndex))
+                        fireTeleport(info.MapName, info.ZoneIndex)
+                        task.wait(3)
+                    end
+                    if not shouldContinueFn() then break end
+
+                    -- Move to ore
+                    task.wait(1)
+                    Functions:SetFloating(true)
+                    local hrp = workspace:FindFirstChild(LocalPlayer.Name)
+                        and workspace[LocalPlayer.Name]:FindFirstChild("HumanoidRootPart")
+                    if hrp and ore.Parent then
+                        print("[ORES] Moving to " .. oreName)
+                        hrp.CFrame = ore.CFrame + Vector3.new(0, 5, 0)
+                    end
+                    task.wait(0.5)
+
+                    -- Wait for ore to die (disappear from folder)
+                    print("[ORES] " .. oreName .. " → waiting for death...")
+                    while shouldContinueFn() and ore.Parent ~= nil do
+                        task.wait(0.5)
+                    end
+                    if ore.Parent == nil then
+                        print("[ORES] " .. oreName .. " killed!")
+                    end
+
+                    Functions:SetFloating(false)
+                end
+
+                -- Return
+                print("[ORES] Returning to " .. tostring(returnMap) .. " zone " .. tostring(returnZone))
+                if returnMap then
+                    fireTeleport(returnMap, returnZone)
+                    task.wait(3)
+                end
+                if returnCFrame then
+                    local c = LocalPlayer.Character
+                    if c and c:FindFirstChild("HumanoidRootPart") then
+                        c.HumanoidRootPart.CFrame = returnCFrame
+                    end
+                end
+                task.wait(1.5)
+                print("[ORES] Farm cycle complete")
+            end
+
+            GameMode:StartOres(getAvailableOres, farmOres)
+        else
+            GameMode:StopOres()
+        end
+    end,
+})
+
+  
 end
 
 return UI
