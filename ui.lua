@@ -1724,12 +1724,11 @@ local FarmBoss = Main:Toggle({
         dragon  = dragonPots,
         globalBosses= bossesPots
     })
-
 -- ─── Auto Ores ────────────────────────────────────────────────────────────
-local OresData = require(game:GetService("ReplicatedStorage").Omni.Shared.Ores)
+local OresData   = require(game:GetService("ReplicatedStorage").Omni.Shared.Ores)
 local oresFolder = workspace:WaitForChild("Server"):WaitForChild("Enemies"):WaitForChild("Ores")
-local ListOres = {}
-local OresInfo = {} -- {oreName = {MapName, ZoneIndex}}
+local ListOres   = {}
+local OresInfo   = {}
 local SelectedOres = {}
 
 for oreName, info in pairs(OresData.List or OresData) do
@@ -1745,9 +1744,49 @@ for oreName, info in pairs(OresData.List or OresData) do
 end
 table.sort(ListOres)
 
-local OreSection = Main:Section({ 
-    Title = "Auto Ores",
-})
+-- ─── Posiciones de escaneo por zona ──────────────────────────────────────
+local OreScanPositions = {
+    ["Leveling Verse_1"] = {
+        Vector3.new(1416.8939, 779.2707, 1902.0698),
+        Vector3.new(1323.2831, 777.6484, 1895.4982),
+        Vector3.new(1406.4100, 778.2757, 2040.7560),
+        Vector3.new(1641.7157, 777.7054, 1910.5868),
+        Vector3.new(1684.4534, 779.2707, 1964.2915),
+        Vector3.new(1788.6586, 777.7054, 2114.7234),
+        Vector3.new(1311.6367, 779.2707, 2180.7827),
+        Vector3.new(1784.5115, 777.7054, 2189.6724),
+        Vector3.new(1166.3776, 779.2707, 2333.6643),
+        Vector3.new(1346.3568, 779.2707, 2331.6470),
+        Vector3.new(1172.7684, 777.7054, 2451.6846),
+        Vector3.new(1789.1282, 777.7054, 2528.3582),
+        Vector3.new(1159.7146, 777.7054, 2571.6055),
+        Vector3.new(1621.2815, 777.7054, 2607.3945),
+        Vector3.new(1287.0565, 777.7054, 2677.9006),
+        Vector3.new(1518.0093, 779.2707, 2683.6790),
+        Vector3.new(1676.0979, 777.7054, 2670.4165),
+        Vector3.new(1176.6515, 777.7054, 2740.1094),
+        -- agregar más posiciones según donde spawneen los minerales
+    },
+    -- agregar más zonas si hay minerales en otros mapas
+    -- ["OtroMapa_1"] = {
+    --     Vector3.new(x, y, z),
+    -- },
+}
+
+local function getOreScanPos(mapName, zoneIndex)
+    local key = mapName .. "_" .. tostring(zoneIndex)
+    local positions = OreScanPositions[key]
+    if not positions then return end
+    for _, pos in ipairs(positions) do
+        pcall(function()
+            LocalPlayer:RequestStreamAroundAsync(pos)
+        end)
+        task.wait(0.3)
+    end
+end
+
+-- ─── UI ───────────────────────────────────────────────────────────────────
+local OreSection = Main:Section({ Title = "Auto Ores" })
 Main:Divider()
 
 Main:Dropdown({
@@ -1767,7 +1806,6 @@ Main:Toggle({
     Value    = false,
     Callback = function(state)
         if state then
-            -- Build list of selected ore names
             local oreNames = {}
             for k, v in pairs(SelectedOres) do
                 if type(k) == "number" then
@@ -1776,34 +1814,33 @@ Main:Toggle({
                     table.insert(oreNames, k)
                 end
             end
+
             if #oreNames == 0 then
                 print("[ORES] No ores selected")
                 return
             end
             print("[ORES] Toggle ON - Ores: " .. table.concat(oreNames, ", "))
 
-            -- Check function: returns list of alive ore BaseParts matching selected names
+            -- ─── Check function ───────────────────────────────────────────
             local function getAvailableOres()
-                local available = {}
-                -- Check if we need RequestStreamAroundAsync for any ore
+                local available  = {}
+                local scannedZones = {}
+
                 for _, oreName in ipairs(oreNames) do
                     local info = OresInfo[oreName]
                     if info then
-                        local onMap = Omni.Data.Map == info.MapName and tostring(Omni.Data.Zone) == tostring(info.ZoneIndex)
-                        if not onMap then
-                            -- Load remote
-                            local cf = BossCFrames[oreName]
-                            if not cf then
-                                -- Use a default position for ore maps (request around zone)
-                                pcall(function()
-                                    LocalPlayer:RequestStreamAroundAsync(Vector3.new(0, 100, 0))
-                                end)
-                                task.wait(1)
-                            end
+                        local zoneKey = info.MapName .. "_" .. tostring(info.ZoneIndex)
+                        local onMap   = Omni.Data.Map == info.MapName
+                            and tostring(Omni.Data.Zone) == tostring(info.ZoneIndex)
+
+                        if not onMap and not scannedZones[zoneKey] then
+                            scannedZones[zoneKey] = true
+                            getOreScanPos(info.MapName, info.ZoneIndex)
+                            task.wait(0.5)
                         end
                     end
                 end
-                -- Read ores folder
+
                 for _, child in ipairs(oresFolder:GetChildren()) do
                     for _, oreName in ipairs(oreNames) do
                         if child.Name == oreName then
@@ -1811,19 +1848,20 @@ Main:Toggle({
                         end
                     end
                 end
+
                 return available
             end
 
-            -- Farm callback
+            -- ─── Farm callback ────────────────────────────────────────────
             local function farmOres(shouldContinueFn)
                 local ores = getAvailableOres()
                 if #ores == 0 then return end
 
                 print("[ORES] Farm cycle: " .. #ores .. " ores")
 
-                local returnMap  = Omni.Data.Map
-                local returnZone = Omni.Data.Zone
-                local char = LocalPlayer.Character
+                local returnMap    = Omni.Data.Map
+                local returnZone   = Omni.Data.Zone
+                local char         = LocalPlayer.Character
                 local returnCFrame = char and char:FindFirstChild("HumanoidRootPart") and char.HumanoidRootPart.CFrame
 
                 for _, ore in ipairs(ores) do
@@ -1831,12 +1869,11 @@ Main:Toggle({
                         print("[ORES] Interrupted")
                         break
                     end
-                    if not ore.Parent then continue end -- already dead
+                    if not ore.Parent then continue end
 
                     local oreName = ore.Name
-                    local info = OresInfo[oreName]
+                    local info    = OresInfo[oreName]
 
-                    -- TP to ore map if needed
                     if info and (Omni.Data.Map ~= info.MapName or tostring(Omni.Data.Zone) ~= tostring(info.ZoneIndex)) then
                         print("[ORES] TP to map: " .. info.MapName .. " zone " .. tostring(info.ZoneIndex))
                         fireTeleport(info.MapName, info.ZoneIndex)
@@ -1844,7 +1881,6 @@ Main:Toggle({
                     end
                     if not shouldContinueFn() then break end
 
-                    -- Move to ore
                     task.wait(1)
                     Functions:SetFloating(true)
                     local hrp = workspace:FindFirstChild(LocalPlayer.Name)
@@ -1855,7 +1891,6 @@ Main:Toggle({
                     end
                     task.wait(0.5)
 
-                    -- Wait for ore to die (disappear from folder)
                     print("[ORES] " .. oreName .. " → waiting for death...")
                     while shouldContinueFn() and ore.Parent ~= nil do
                         task.wait(0.5)
@@ -1867,7 +1902,6 @@ Main:Toggle({
                     Functions:SetFloating(false)
                 end
 
-                -- Return
                 print("[ORES] Returning to " .. tostring(returnMap) .. " zone " .. tostring(returnZone))
                 if returnMap then
                     fireTeleport(returnMap, returnZone)
