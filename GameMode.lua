@@ -499,18 +499,25 @@ local function ensureSchedulerRunning()
                 end
                 task.wait(2)
             elseif activity == "Ores" then
-                print("[SCHEDULER] Ores available → farming")
-                pauseAutoFarm()
-                local oresPots = potionSystems and potionSystems.ores
-                if oresPots then oresPots:OnStart() end
-                if oresFarmCallback then
-                    oresFarmCallback(function()
-                        return oresEnabled and not hasHigherPriorityTrial()
-                    end)
+                local ores = oresCheckFn()
+
+                if not ores or #ores == 0 then
+                    print("[SCHEDULER] No ores found → waiting 5s")
+                    task.wait(5)
+                else
+                    print("[SCHEDULER] Ores found: " .. #ores .. " → farming")
+                    pauseAutoFarm()
+                    local oresPots = potionSystems and potionSystems.ores
+                    if oresPots then oresPots:OnStart() end
+                    if oresFarmCallback then
+                        oresFarmCallback(function()
+                            return oresEnabled and not hasHigherPriorityTrial()
+                        end)
+                    end
+                    if oresPots then oresPots:OnFinish() end
+                    resumeAutoFarm()
+                    task.wait(1.5)
                 end
-                if oresPots then oresPots:OnFinish() end
-                resumeAutoFarm()
-                task.wait(1.5)
             elseif activity == "BossGlobal" then
                 print("[SCHEDULER] Boss Global alive → farming")
                 pauseAutoFarm()
