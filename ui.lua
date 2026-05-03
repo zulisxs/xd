@@ -49,7 +49,7 @@ function UI:Init(WindUI, Functions, GameMode)
 })
 	
 	Window:Tag({
-    Title = "v1.1",
+    Title = "v1.2",
     Icon = "flame",
     Color = Color3.fromHex("#a200ff"),
     Radius = 13, -- from 0 to 13
