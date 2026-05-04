@@ -1341,15 +1341,15 @@ local function loadTemplatesRemote(bossName)
         end
         done = true
     end)
-    -- Wait max 5 seconds for stream
-    local deadline = tick() + 5
+    -- Wait max 2 seconds for stream
+    local deadline = tick() + 2
     while not done and tick() < deadline do
         task.wait(0.2)
     end
     -- After stream, wait for boss folder to appear
     local gbFolder = getTemplatesFolder()
     if gbFolder then
-        local bf = gbFolder:WaitForChild(bossName, 5)
+        local bf = gbFolder:WaitForChild(bossName, 2)
         if bf then
             print("[BOSS] " .. bossName .. " template loaded via stream")
         else
@@ -1850,8 +1850,8 @@ local function streamOrePositions()
             pending = pending - 1
         end)
     end
-    -- Wait for all to finish (max 5s)
-    local deadline = tick() + 5
+    -- Wait for all to finish (max 2s)
+    local deadline = tick() + 2
     while pending > 0 and tick() < deadline do
         task.wait(0.3)
     end
