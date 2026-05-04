@@ -1303,8 +1303,20 @@ local LocalPlayer = game:GetService("Players").LocalPlayer
 -- ─── Sistema de countdown local (sin UI) ──────────────────────────────────
 local bossTimers = {} -- {bossName = {deadline = tick() + seconds, alive = bool}}
 
+local function getTemplatesFolder()
+    local s = workspace:FindFirstChild("Server")
+    if not s then return nil end
+    local e = s:FindFirstChild("Enemies")
+    if not e then return nil end
+    local t = e:FindFirstChild("Templates")
+    if not t then return nil end
+    return t:FindFirstChild("Global Bosses")
+end
+
 local function readBossTimer(bossName)
-    local bf = templates:FindFirstChild(bossName)
+    local gbFolder = getTemplatesFolder()
+    if not gbFolder then return nil end
+    local bf = gbFolder:FindFirstChild(bossName)
     if not bf then return nil end
     local hud = bf:FindFirstChild("HUD")
     local t = hud and hud:FindFirstChild("Time")
@@ -1325,19 +1337,25 @@ local function loadTemplatesRemote(bossName)
             LocalPlayer:RequestStreamAroundAsync(pos)
         end)
         if not ok then
-            print("[BOSS] RequestStreamAroundAsync failed for " .. bossName .. ": " .. tostring(err))
+            print("[BOSS] Stream failed for " .. bossName .. ": " .. tostring(err))
         end
         done = true
     end)
-    -- Wait max 5 seconds
+    -- Wait max 5 seconds for stream
     local deadline = tick() + 5
     while not done and tick() < deadline do
         task.wait(0.2)
     end
-    if not done then
-        print("[BOSS] RequestStreamAroundAsync timeout for " .. bossName)
+    -- After stream, wait for boss folder to appear
+    local gbFolder = getTemplatesFolder()
+    if gbFolder then
+        local bf = gbFolder:WaitForChild(bossName, 5)
+        if bf then
+            print("[BOSS] " .. bossName .. " template loaded via stream")
+        else
+            print("[BOSS] " .. bossName .. " template not found after stream")
+        end
     end
-    task.wait(0.5)
 end
 
 local function isOnBossMap(bossName)
