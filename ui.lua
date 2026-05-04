@@ -1817,38 +1817,55 @@ Main:Toggle({
             end
             print("[ORES] Toggle ON - Ores: " .. table.concat(oreNames, ", "))
 
--- Scan positions per zone for RequestStreamAroundAsync
--- Key = "MapName_ZoneIndex", value = Vector3 position to stream around
-local OreScanPositions = {
-    ["Leveling Verse_1"] = Vector3.new(1287.05652, 777.705383, 2677.90063, 1, 0, 0, 0, 1, 0, 0, 0, 1), -- TODO: replace with actual ore spawn area position
+-- Ore spawn positions for RequestStreamAroundAsync (Leveling Verse zone 1)
+local OreSpawnPositions = {
+    Vector3.new(1416.8939, 779.2707, 1902.0698),
+    Vector3.new(1323.2831, 777.6484, 1895.4982),
+    Vector3.new(1406.4100, 778.2757, 2040.7560),
+    Vector3.new(1641.7157, 777.7054, 1910.5868),
+    Vector3.new(1684.4534, 779.2707, 1964.2915),
+    Vector3.new(1788.6586, 777.7054, 2114.7234),
+    Vector3.new(1311.6367, 779.2707, 2180.7827),
+    Vector3.new(1784.5115, 777.7054, 2189.6724),
+    Vector3.new(1166.3776, 779.2707, 2333.6643),
+    Vector3.new(1346.3568, 779.2707, 2331.6470),
+    Vector3.new(1172.7684, 777.7054, 2451.6846),
+    Vector3.new(1789.1282, 777.7054, 2528.3582),
+    Vector3.new(1159.7146, 777.7054, 2571.6055),
+    Vector3.new(1621.2815, 777.7054, 2607.3945),
+    Vector3.new(1287.0565, 777.7054, 2677.9006),
+    Vector3.new(1518.0093, 779.2707, 2683.6790),
+    Vector3.new(1676.0979, 777.7054, 2670.4165),
+    Vector3.new(1176.6515, 777.7054, 2740.1094),
 }
 
-local function getOreScanPos(mapName, zoneIndex)
-    local key = mapName .. "_" .. tostring(zoneIndex)
-    return OreScanPositions[key]
+local function streamOrePositions()
+    for i, pos in ipairs(OreSpawnPositions) do
+        local done = false
+        task.spawn(function()
+            pcall(function()
+                LocalPlayer:RequestStreamAroundAsync(pos)
+            end)
+            done = true
+        end)
+        local deadline = tick() + 3
+        while not done and tick() < deadline do
+            task.wait(0.2)
+        end
+    end
+    print("[ORES] All 18 positions scanned")
+end
+
+local function isOnOreMap()
+    return Omni.Data.Map == "Leveling Verse" and tostring(Omni.Data.Zone) == "1"
 end
 
             -- Check function: returns list of alive ore BaseParts matching selected names
             local function getAvailableOres()
                 local available = {}
                 -- Stream around ore zones if not on that map
-                local scannedZones = {}
-                for _, oreName in ipairs(oreNames) do
-                    local info = OresInfo[oreName]
-                    if info then
-                        local zoneKey = info.MapName .. "_" .. tostring(info.ZoneIndex)
-                        local onMap = Omni.Data.Map == info.MapName and tostring(Omni.Data.Zone) == tostring(info.ZoneIndex)
-                        if not onMap and not scannedZones[zoneKey] then
-                            scannedZones[zoneKey] = true
-                            local scanPos = getOreScanPos(info.MapName, info.ZoneIndex)
-                            if scanPos then
-                                pcall(function()
-                                    LocalPlayer:RequestStreamAroundAsync(scanPos)
-                                end)
-                                task.wait(1.5)
-                            end
-                        end
-                    end
+                if not isOnOreMap() then
+                    streamOrePositions()
                 end
                 -- Read ores folder
                 for _, child in ipairs(oresFolder:GetChildren()) do
