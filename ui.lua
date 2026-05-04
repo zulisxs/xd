@@ -1840,20 +1840,22 @@ local OreSpawnPositions = {
 }
 
 local function streamOrePositions()
-    for i, pos in ipairs(OreSpawnPositions) do
-        local done = false
+    local pending = #OreSpawnPositions
+    -- Fire all 18 in parallel
+    for _, pos in ipairs(OreSpawnPositions) do
         task.spawn(function()
             pcall(function()
                 LocalPlayer:RequestStreamAroundAsync(pos)
             end)
-            done = true
+            pending = pending - 1
         end)
-        local deadline = tick() + 3
-        while not done and tick() < deadline do
-            task.wait(0.2)
-        end
     end
-    print("[ORES] All 18 positions scanned")
+    -- Wait for all to finish (max 5s)
+    local deadline = tick() + 5
+    while pending > 0 and tick() < deadline do
+        task.wait(0.3)
+    end
+    print("[ORES] Scan complete (" .. (18 - pending) .. "/18 loaded)")
 end
 
 local function isOnOreMap()
