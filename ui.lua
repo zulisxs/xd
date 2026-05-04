@@ -1314,12 +1314,30 @@ end
 
 local function loadTemplatesRemote(bossName)
     local cf = BossCFrames[bossName]
-    if not cf then return end
+    if not cf then
+        print("[BOSS] No CFrame for " .. bossName .. ", skipping stream")
+        return
+    end
     local pos = cf.Position
-    pcall(function()
-        LocalPlayer:RequestStreamAroundAsync(pos)
+    local done = false
+    task.spawn(function()
+        local ok, err = pcall(function()
+            LocalPlayer:RequestStreamAroundAsync(pos)
+        end)
+        if not ok then
+            print("[BOSS] RequestStreamAroundAsync failed for " .. bossName .. ": " .. tostring(err))
+        end
+        done = true
     end)
-    task.wait(1.5)
+    -- Wait max 5 seconds
+    local deadline = tick() + 5
+    while not done and tick() < deadline do
+        task.wait(0.2)
+    end
+    if not done then
+        print("[BOSS] RequestStreamAroundAsync timeout for " .. bossName)
+    end
+    task.wait(0.5)
 end
 
 local function isOnBossMap(bossName)
