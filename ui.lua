@@ -1882,55 +1882,71 @@ end
 
             -- Farm callback
             local function farmOres(shouldContinueFn)
-                local ores = getAvailableOres()
-                if #ores == 0 then return end
-
-                print("[ORES] Farm cycle: " .. #ores .. " ores")
-
                 local returnMap  = Omni.Data.Map
                 local returnZone = Omni.Data.Zone
                 local char = LocalPlayer.Character
                 local returnCFrame = char and char:FindFirstChild("HumanoidRootPart") and char.HumanoidRootPart.CFrame
 
-                for _, ore in ipairs(ores) do
-                    if not shouldContinueFn() then
-                        print("[ORES] Interrupted")
+                -- TP to ore map if needed
+                local firstInfo = OresInfo[oreNames[1]]
+                if firstInfo and (Omni.Data.Map ~= firstInfo.MapName or tostring(Omni.Data.Zone) ~= tostring(firstInfo.ZoneIndex)) then
+                    fireTeleport(firstInfo.MapName, firstInfo.ZoneIndex)
+                    task.wait(3)
+                end
+
+                -- Continuous loop: keep farming until no more ores
+                while shouldContinueFn() do
+                    -- Re-read ores folder directly (already on map or streamed)
+                    local ores = {}
+                    for _, child in ipairs(oresFolder:GetChildren()) do
+                        for _, oreName in ipairs(oreNames) do
+                            if child.Name == oreName then
+                                table.insert(ores, child)
+                            end
+                        end
+                    end
+
+                    if #ores == 0 then
+                        print("[ORES] No more ores found, cycle done")
                         break
                     end
-                    if not ore.Parent then continue end -- already dead
 
-                    local oreName = ore.Name
-                    local info = OresInfo[oreName]
+                    print("[ORES] Found " .. #ores .. " ores")
 
-                    -- TP to ore map if needed
-                    if info and (Omni.Data.Map ~= info.MapName or tostring(Omni.Data.Zone) ~= tostring(info.ZoneIndex)) then
-                        print("[ORES] TP to map: " .. info.MapName .. " zone " .. tostring(info.ZoneIndex))
-                        fireTeleport(info.MapName, info.ZoneIndex)
-                        task.wait(3)
-                    end
-                    if not shouldContinueFn() then break end
+                    for _, ore in ipairs(ores) do
+                        if not shouldContinueFn() then break end
+                        if not ore.Parent then continue end
 
-                    -- Move to ore
-                    task.wait(1)
-                    Functions:SetFloating(true)
-                    local hrp = workspace:FindFirstChild(LocalPlayer.Name)
-                        and workspace[LocalPlayer.Name]:FindFirstChild("HumanoidRootPart")
-                    if hrp and ore.Parent then
-                        print("[ORES] Moving to " .. oreName)
-                        hrp.CFrame = ore.CFrame + Vector3.new(0, 5, 0)
-                    end
-                    task.wait(0.5)
-
-                    -- Wait for ore to die (disappear from folder)
-                    print("[ORES] " .. oreName .. " → waiting for death...")
-                    while shouldContinueFn() and ore.Parent ~= nil do
+                        -- Move to ore first
+                        Functions:SetFloating(true)
+                        local hrp = workspace:FindFirstChild(LocalPlayer.Name)
+                            and workspace[LocalPlayer.Name]:FindFirstChild("HumanoidRootPart")
+                        if hrp and ore.Parent then
+                            print("[ORES] Moving to " .. ore.Name)
+                            hrp.CFrame = ore.CFrame + Vector3.new(0, 5, 0)
+                        end
                         task.wait(0.5)
-                    end
-                    if ore.Parent == nil then
-                        print("[ORES] " .. oreName .. " killed!")
+
+                        -- Check if ore still alive after arriving
+                        if not ore.Parent then
+                            print("[ORES] " .. ore.Name .. " already gone")
+                            Functions:SetFloating(false)
+                            continue
+                        end
+
+                        -- Wait for ore to die
+                        print("[ORES] " .. ore.Name .. " → waiting for death...")
+                        while shouldContinueFn() and ore.Parent ~= nil do
+                            task.wait(0.5)
+                        end
+                        if ore.Parent == nil then
+                            print("[ORES] " .. ore.Name .. " killed!")
+                        end
+                        Functions:SetFloating(false)
                     end
 
-                    Functions:SetFloating(false)
+                    -- After farming batch, small wait then re-check
+                    task.wait(1)
                 end
 
                 -- Return
