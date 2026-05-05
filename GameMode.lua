@@ -54,7 +54,7 @@ local TEMPEST_FIXED_CFRAME = CFrame.new(-2851.12109, 203.811783, -1679.35889, 0.
 
 -- Tower v2 (posición fija)
 local towerV2 = false
-local TOWER_FIXED_CFRAME = CFrame.new(28124.6855, 835.807373, -15839.3848, 0.9999879, 0.00492032571, -1.2104947e-05, -0.00492032571, 0.999975801, -0.00492032571, -1.2104947e-05, 0.00492032571, 0.9999879)
+local TOWER_FIXED_CFRAME = CFrame.new(28124.6855, 835.807373, -15839.3848, 0.9999879, 0.00492032571, -1.2104947e-05, -0.00492032571, 0.999975801, -0.00492032571, -1.2104947e-05, 0.00492032571, 0.9999879) -- TODO: replace with actual Tower center position
 
 -- ─── BridgeNet ────────────────────────────────────────────────────────────────
 
@@ -430,12 +430,20 @@ local function runGamemode(gamemodeName, waveTarget, savedPosition)
     local waitForEnd  = false -- se determina dinámicamente desde el HUD
 
     local useFixedPos = (gamemodeName == "Tempest Invasion" and tempestV2)
+        or (gamemodeName == "Tower" and towerV2)
+    local fixedCFrame = nil
+    if gamemodeName == "Tempest Invasion" and tempestV2 then
+        fixedCFrame = TEMPEST_FIXED_CFRAME
+    elseif gamemodeName == "Tower" and towerV2 then
+        fixedCFrame = TOWER_FIXED_CFRAME
+    end
+
     local farmTask = task.spawn(function()
         local runCheck = function()
             return isToggleOnFor(gamemodeName) and not finished and not interrupted
         end
-        if useFixedPos then
-            holdFixedPosition(TEMPEST_FIXED_CFRAME, runCheck)
+        if useFixedPos and fixedCFrame then
+            holdFixedPosition(fixedCFrame, runCheck)
         else
             farmEnemiesInGamemode(gamemodeName, runCheck)
         end
