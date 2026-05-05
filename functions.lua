@@ -157,7 +157,8 @@ local function killLoop(selectedEnemies, priority, isRunningFn)
 
             teleportTo(enemy.CFrame)
 
-            local _, finalDamage = PlayerStats.Damage(Omni.Data, Omni.Instance)
+            local ok, _, finalDamage = pcall(PlayerStats.Damage, Omni.Data, Omni.Instance)
+            if not ok then finalDamage = 0 end
             local enemyHealth = enemy:GetAttribute("Health") or 0
 
             if finalDamage >= enemyHealth then
