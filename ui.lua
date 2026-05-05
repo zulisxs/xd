@@ -419,6 +419,50 @@ GameModeTab:Toggle({
             GameMode:SetTempestV2(state)
         end,
     })
+    
+    -- ─── Tower ─────────────────────────────────────────────────────────────
+    GameModeTab:Section({ Title = "Tower", TextXAlignment = "Left" })
+
+    local towerWaveTarget = 25
+
+    GameModeTab:Input({
+        Title       = "Leave Tower",
+        Desc        = "Exit after completing the wave",
+        InputIcon   = "undo-2",
+        Type        = "Input",
+        Placeholder = "Enter wave",
+        Value       = "25",
+        Callback    = function(input)
+            local n = tonumber(input)
+            if n then towerWaveTarget = n end
+        end,
+    })
+
+    GameModeTab:Toggle({
+        Title    = "Auto Farm Tower",
+        Icon     = "check",
+        Type     = "Checkbox",
+        Value    = false,
+        Callback = function(state)
+            GameMode:UpdateAutoFarmParams(selectedEnemies, selectedPriority)
+            if state then
+                GameMode:StartTower(towerWaveTarget, savedPosition)
+            else
+                GameMode:StopTower()
+            end
+        end,
+    })
+
+    GameModeTab:Toggle({
+        Title    = "Auto Farm Tower v2",
+        Desc     = "Stay at center of the map instead of chasing enemies",
+        Icon     = "check",
+        Type     = "Checkbox",
+        Value    = false,
+        Callback = function(state)
+            GameMode:SetTowerV2(state)
+        end,
+    })
 -------------------------------------Auto rename y auto sell no cambiar nada de aca para abajo------------------------------------
 
 
