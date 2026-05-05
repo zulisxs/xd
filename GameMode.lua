@@ -29,12 +29,14 @@ local oresFarmCallback = nil -- fn(shouldContinueFn)
 
 -- Toggle states (cada toggle es independiente)
 local trialEnabled   = false
+local towerEnabled   = false
 local tempestEnabled = false
 local dragonEnabled  = false
 
 -- Parámetros por gamemode
 local selectedTrialsRef = {}
 local trialWaveTargets  = {}
+local towerWaveTarget  = 25
 local tempestWaveTarget = 25
 local dragonWaveTarget  = 25
 
@@ -49,6 +51,10 @@ local autoFarmPaused = false
 -- Tempest v2 (posición fija en el centro del mapa)
 local tempestV2 = false
 local TEMPEST_FIXED_CFRAME = CFrame.new(-2851.12109, 203.811783, -1679.35889, 0.999148726, -0, -0.0412531383, 0, 1, -0, 0.0412531383, 0, 0.999148726)
+
+-- Tower v2 (posición fija)
+local towerV2 = false
+local TOWER_FIXED_CFRAME = CFrame.new(28124.6855, 835.807373, -15839.3848, 0.9999879, 0.00492032571, -1.2104947e-05, -0.00492032571, 0.999975801, -0.00492032571, -1.2104947e-05, 0.00492032571, 0.9999879)
 
 -- ─── BridgeNet ────────────────────────────────────────────────────────────────
 
@@ -336,14 +342,21 @@ local function getHighestPriorityActivity()
         end
     end
 
-    -- Prioridad 4: Tempest (bloquea Dragon si está activo)
+    -- Prioridad 4: Tower
+    if towerEnabled then
+        if now >= (reentryTimers["Tower"] or 0) then
+            return "Tower"
+        end
+    end
+
+    -- Prioridad 5: Tempest (bloquea Dragon si está activo)
     if tempestEnabled then
         if now >= (reentryTimers["Tempest Invasion"] or 0) then
             return "Tempest Invasion"
         end
     end
 
-    -- Prioridad 5: Dragon (solo si Tempest NO está activo)
+    -- Prioridad 6: Dragon (solo si Tempest NO está activo)
     if dragonEnabled and not tempestEnabled then
         if now >= (reentryTimers["Dragon Defense"] or 0) then
             return "Dragon Defense"
@@ -354,7 +367,9 @@ local function getHighestPriorityActivity()
 end
 
 local function getWaveTargetFor(activity)
-    if activity == "Tempest Invasion" then
+    if activity == "Tower" then
+        return towerWaveTarget
+    elseif activity == "Tempest Invasion" then
         return tempestWaveTarget
     elseif activity == "Dragon Defense" then
         return dragonWaveTarget
@@ -364,7 +379,9 @@ local function getWaveTargetFor(activity)
 end
 
 local function isToggleOnFor(activity)
-    if activity == "Tempest Invasion" then
+    if activity == "Tower" then
+        return towerEnabled
+    elseif activity == "Tempest Invasion" then
         return tempestEnabled
     elseif activity == "Dragon Defense" then
         return dragonEnabled
@@ -375,11 +392,13 @@ end
 
 local function shouldInterruptFor(activity)
     if activity:find("Trial") then
-        return false -- Trials nunca se interrumpen
+        return false
+    elseif activity == "Tower" then
+        return hasHigherPriorityTrial()
     elseif activity == "Tempest Invasion" then
         return hasHigherPriorityTrial()
     elseif activity == "Dragon Defense" then
-        return tempestEnabled or hasHigherPriorityTrial()
+        return towerEnabled or tempestEnabled or hasHigherPriorityTrial()
     end
     return false
 end
@@ -479,7 +498,7 @@ end
 -- ─── Scheduler ────────────────────────────────────────────────────────────────
 
 local function anyToggleOn()
-    return trialEnabled or tempestEnabled or dragonEnabled or bossGlobalEnabled or oresEnabled
+    return trialEnabled or towerEnabled or tempestEnabled or dragonEnabled or bossGlobalEnabled or oresEnabled
 end
 
 local function ensureSchedulerRunning()
@@ -591,6 +610,21 @@ function GameMode:StopTrial()
     trialEnabled = false
 end
 
+function GameMode:StartTower(waveTarget, savedPosition)
+    towerWaveTarget  = waveTarget or 25
+    savedPositionRef = savedPosition
+    towerEnabled     = true
+    ensureSchedulerRunning()
+end
+
+function GameMode:StopTower()
+    towerEnabled = false
+end
+
+function GameMode:SetTowerV2(state)
+    towerV2 = state
+end
+
 function GameMode:StartTempest(waveTarget, savedPosition)
     tempestWaveTarget = waveTarget or 25
     savedPositionRef  = savedPosition
@@ -619,6 +653,7 @@ end
 
 function GameMode:StopAll()
     trialEnabled   = false
+    towerEnabled   = false
     tempestEnabled = false
     dragonEnabled  = false
     currentGamemode = nil
