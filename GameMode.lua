@@ -1,5 +1,5 @@
 local GameMode = {}
-
+--a
 local Players    = game:GetService("Players")
 local RepStorage = game:GetService("ReplicatedStorage")
 local Omni       = require(RepStorage:WaitForChild("Omni"))
